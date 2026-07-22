@@ -117,13 +117,14 @@ class SettingsConstructor:
     def __init__(self, settings: BaseSettings):
         self._settings = settings
 
-    def get_settings(self, args: Namespace) -> BaseSettings:
+    def get_settings(self, args: Namespace | None) -> BaseSettings:
         """
         Get settings based on argparse arguments and .ini configuration.
 
         Each argument must be complementary i.e. either in .ini or argparse (no duplications)
         """
-        args_settings = self._settings.__class__(**vars(args))
+        init_args = {} if args is None else vars(args)
+        args_settings = self._settings.__class__(**init_args)
 
         if not args_settings.is_complementary(self._settings):
             raise ConfigException(f"Provide {', '.join(self._settings.names)} either in .ini or command line arguments")
@@ -153,7 +154,7 @@ class SettingsManager:
         migration_settings = settings_builder.build(SettingsType.migrations, ini_parser)
         self._migration_constructor = SettingsConstructor(migration_settings)
 
-    def get_config(self, args: Namespace) -> Config:
+    def get_config(self, args: Namespace | None) -> Config:
         """
         Build config based on .ini configuration and provided argparse arguments.
         """
@@ -161,7 +162,7 @@ class SettingsManager:
         ret = Config(**config_settings.model_dump())
         return ret
 
-    def get_migrations(self, args: Namespace) -> str:
+    def get_migrations(self, args: Namespace | None) -> str:
         """
         Get migrations folder name based on .ini configuration and provided name.
 
