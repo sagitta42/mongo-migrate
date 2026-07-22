@@ -1,5 +1,7 @@
+from argparse import Namespace
 from configparser import ConfigParser
 from dataclasses import dataclass
+import enum
 from pydantic import BaseModel, ConfigDict
 from typing import Optional, Self
 
@@ -8,6 +10,9 @@ from mongo_migrate.exceptions import ConfigException
 
 @dataclass
 class Config:
+    """
+    MigrationManager Config
+    """
     host: str
     port: int
     database: str
@@ -16,6 +21,7 @@ class BaseSettings(BaseModel):
     """
     Base parent class for settings.
     """
+    model_config = ConfigDict(extra="ignore")
 
     @property
     def names(self) -> list[str]:
@@ -60,17 +66,74 @@ class ConfigSettings(BaseSettings):
     """
     Settings for MigrationManager Config
     """
-    model_config = ConfigDict(extra="ignore")
-
     host: Optional[str] = None
     port: Optional[int] = None
     database: Optional[str] = None
+
 
 class MigrationSettings(BaseSettings):
     migrations: Optional[str] = None
 
 
+class SettingsType(str, enum.Enum):
+    """
+    Type of settings.
+
+    Value corresponds to section name in .ini file.
+    """
+    database = "database"
+    migrations = "migrations"
+
+
+class SettingsClass(enum.Enum):
+    """
+    Name of section in .ini corresponding to settings
+    """
+    database = ConfigSettings
+    migrations = MigrationSettings
+
+    @classmethod
+    def from_settings_type(cls, settings_type: SettingsType):
+        return cls[settings_type.name]
+
+
 class SettingsBuilder:
+    def build(self, settings_type: SettingsType, parser: ConfigParser) -> BaseSettings:
+        """
+        Build settings of given type based on .ini parser values
+        """
+        settings_class = SettingsClass.from_settings_type(settings_type).value
+        settings_args = parser[settings_type.value] if settings_type.value in parser.sections() else {}
+        ret = settings_class(**settings_args)
+        return ret
+
+
+class SettingsConstructor:
+    """
+    Settings constructor.
+
+    Combines provided argparser arguments with .ini settings.
+    """
+    def __init__(self, settings: BaseSettings):
+        self._settings = settings
+
+    def get_settings(self, args: Namespace) -> BaseSettings:
+        """
+        Get settings based on argparse arguments and .ini configuration.
+
+        Each argument must be complementary i.e. either in .ini or argparse (no duplications)
+        """
+        args_settings = self._settings.__class__(**vars(args))
+
+        if not args_settings.is_complementary(self._settings):
+            raise ConfigException(f"Provide {', '.join(self._settings.names)} either in .ini or command line arguments")
+
+        final_settings = args_settings + self._settings
+        return final_settings
+
+
+
+class SettingsManager:
     """
     Builder for migration settings.
 
@@ -82,37 +145,27 @@ class SettingsBuilder:
         ini_parser = ConfigParser()
         ini_parser.read(self._config_file)
 
-        self._config_settings = ConfigSettings(**ini_parser["database"])
-        self._migration_settings = MigrationSettings(**ini_parser["migrations"])
+        settings_builder = SettingsBuilder()
 
-    def build_config(self, host: str | None = None, port: int | None = None, database: str | None = None) -> Config:
+        config_settings = settings_builder.build(SettingsType.database, ini_parser)
+        self._config_constructor = SettingsConstructor(config_settings)
+
+        migration_settings = settings_builder.build(SettingsType.migrations, ini_parser)
+        self._migration_constructor = SettingsConstructor(migration_settings)
+
+    def get_config(self, args: Namespace) -> Config:
         """
-        Build config based on .ini configuration and provided host, port, and database name.
-
-        Each argument must be complementary i.e. either in .ini or provided (no duplications)
+        Build config based on .ini configuration and provided argparse arguments.
         """
-
-        args_settings = ConfigSettings(host=host, port=port, database=database)
-
-        if not args_settings.is_complementary(self._config_settings):
-            raise ConfigException(f"Provide {', '.join(args_settings.names)} either in {self._config_file} or command line arguments")
-
-        final_settings = args_settings + self._config_settings
-
-        ret = Config(**final_settings.model_dump())
+        config_settings = self._config_constructor.get_settings(args)
+        ret = Config(**config_settings.model_dump())
         return ret
 
-    def get_migrations(self, migrations: str | None = None) -> str:
+    def get_migrations(self, args: Namespace) -> str:
         """
         Get migrations folder name based on .ini configuration and provided name.
 
         Either one or other must be provided.
         """
-        args_settings = MigrationSettings(migrations=migrations)
-
-        if not args_settings.is_complementary(self._migration_settings):
-            raise ConfigException(f"Provide {args_settings.names} either in {self._config_file} or command line arguments")
-
-        final_settings = args_settings + self._migration_settings
-
-        return final_settings.migrations       
+        migration_settings = self._migration_constructor.get_settings(args)
+        return migration_settings.migrations

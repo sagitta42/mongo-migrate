@@ -15,11 +15,11 @@
 """
 import argparse
 
-from mongo_migrate.settings import SettingsBuilder
+from mongo_migrate.settings import SettingsManager
 from mongo_migrate.migration_manager import MigrationManager
 from mongo_migrate.utils import slugify_message
 
-settings_builder = SettingsBuilder()
+settings_manager = SettingsManager()
 
 def subparser_for_create(subparsers):
     """Subparser for create command"""
@@ -36,8 +36,8 @@ def subparser_for_create(subparsers):
 
 def create_migration(args):
     """Entry point for create migration command"""
-    config = settings_builder.build_config(args.host, args.port, args.database)
-    migrations = settings_builder.get_migrations(args.migrations)
+    config = settings_manager.get_config(args)
+    migrations = settings_manager.get_migrations(args)
     m = MigrationManager(config, migrations)
     m.create_migration(args.title or slugify_message(args.message), args.message)
 
@@ -70,8 +70,8 @@ def subparser_for_downgrade(subparsers):
 
 def migrate(args):
     """Entry point for both upgrade and downgrade"""
-    config = settings_builder.build_config(args.host, args.port, args.database)
-    migrations = settings_builder.get_migrations(args.migrations)
+    config = settings_manager.get_config(args)
+    migrations = settings_manager.get_migrations(args)
     m = MigrationManager(config, migrations)
     m.migrate(args.type, args.upto)
 
