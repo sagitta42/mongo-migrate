@@ -15,10 +15,11 @@
 """
 import argparse
 
-from mongo_migrate.config import ConfigBuilder
+from mongo_migrate.settings import SettingsBuilder
 from mongo_migrate.migration_manager import MigrationManager
 from mongo_migrate.utils import slugify_message
 
+settings_builder = SettingsBuilder()
 
 def subparser_for_create(subparsers):
     """Subparser for create command"""
@@ -28,15 +29,16 @@ def subparser_for_create(subparsers):
     create_subparser.add_argument('--host', help='the database host (overrides .env)', default=None, action='store', dest='host')
     create_subparser.add_argument('--port', help='the database port (overrides .env)', default=None, action='store', dest='port')
     create_subparser.add_argument('--database', help='the database name (overrides .env)', default=None, action='store', dest='database')
-    create_subparser.add_argument('--migrations', help='provide the folder to store migrations. By default creates migrations/', default='migrations', action='store', dest='migrations')
+    create_subparser.add_argument('--migrations', help='provide the folder to store migrations. By default creates migrations/', default=None, action='store', dest='migrations')
     create_subparser.add_argument('--message', help='short message that will be saved as a comment inside the migration file', required=True, action='store', dest='message')
     create_subparser.add_argument('--title', help='short title that will be used in the file name. Default: contents of --message', default=None, action='store', dest='title')
 
 
 def create_migration(args):
     """Entry point for create migration command"""
-    config = ConfigBuilder().build(args.host, args.port, args.database)
-    m = MigrationManager(config, args.migrations)
+    config = settings_builder.build_config(args.host, args.port, args.database)
+    migrations = settings_builder.get_migrations(args.migrations)
+    m = MigrationManager(config, migrations)
     m.create_migration(args.title or slugify_message(args.message), args.message)
 
 
@@ -68,8 +70,9 @@ def subparser_for_downgrade(subparsers):
 
 def migrate(args):
     """Entry point for both upgrade and downgrade"""
-    config = ConfigBuilder().build(args.host, args.port, args.database)
-    m = MigrationManager(config, args.migrations)
+    config = settings_builder.build_config(args.host, args.port, args.database)
+    migrations = settings_builder.get_migrations(args.migrations)
+    m = MigrationManager(config, migrations)
     m.migrate(args.type, args.upto)
 
 
