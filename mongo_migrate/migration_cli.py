@@ -47,6 +47,13 @@ def create_migration(args):
     m = MigrationManager(config, migrations)
     m.create_migration(args.title or slugify_message(args.message), args.message)
 
+def add_migrate_arguments(parser: argparse.ArgumentParser, type: str):
+    """
+    Add target migration timestamp argument.
+    """
+    parser.add_argument('target_migration', help='target migration timestamp', action='store')
+    parser.add_argument('--type', help=argparse.SUPPRESS, action='store', dest='type', default=type)
+
 
 def subparser_for_upgrade(subparsers):
     """Subparser for upgrade command"""
@@ -54,9 +61,7 @@ def subparser_for_upgrade(subparsers):
     upgrade_subparser.set_defaults(func=migrate)
 
     add_common_arguments(upgrade_subparser)
-
-    upgrade_subparser.add_argument('--upto', help='target migration timestamp', action='store', dest='upto')
-    upgrade_subparser.add_argument('--type', help=argparse.SUPPRESS, action='store', dest='type', default='upgrade')
+    add_migrate_arguments(upgrade_subparser, "upgrade")
 
 
 def subparser_for_downgrade(subparsers):
@@ -65,9 +70,7 @@ def subparser_for_downgrade(subparsers):
     upgrade_subparser.set_defaults(func=migrate)
 
     add_common_arguments(upgrade_subparser)
-
-    upgrade_subparser.add_argument('--upto', help='target migration timestamp', action='store', dest='upto')
-    upgrade_subparser.add_argument('--type', help=argparse.SUPPRESS, action='store', dest='type', default='downgrade')
+    add_migrate_arguments(upgrade_subparser, "downgrade")
 
 
 def migrate(args):
@@ -75,7 +78,7 @@ def migrate(args):
     config = settings_manager.get_config(args)
     migrations = settings_manager.get_migrations(args)
     m = MigrationManager(config, migrations)
-    m.migrate(args.type, args.upto)
+    m.migrate(args.type, args.target_migration)
 
 
 def parse_arguments():
