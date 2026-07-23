@@ -75,17 +75,38 @@ class MigrationViewer:
         ret = self._migration_map[timestamp]
         return ret
 
-    def get_timestamp(self, key: str) -> str | None:
+    def get_timestamp(self, key: str, reference_timestamp: str | None) -> str | None:
         """
-        Get migration timestamp based on keyword.
+        Get migration timestamp based on keyword and reference timestamp.
 
-        key (str): head or base
+        key (str): head/base/+1/-1
+
+        Null reference timestamp means no migrated timestamp (at base)
         """
         if key == "head":
             return self.last_migration.timestamp
         
         if key == "base":
             return None
+
+        if key == "+1":
+            if reference_timestamp is None:
+                return self.first_migration.timestamp
+
+            next_migration = self.get_migration(reference_timestamp).next
+            if next_migration is None:
+                return self.last_migration.timestamp
+            
+            return next_migration.timestamp
+
+        if key == "-1":
+            if reference_timestamp is None:
+                return None
+
+            previous_migration = self.get_migration(reference_timestamp).previous
+            if previous_migration is None:
+                return None
+            return previous_migration.timestamp
 
 
     def get_migrations_between(self, timestamp_from: str | None, timestamp_to: str | None) -> list[Migration]:

@@ -25,6 +25,7 @@ from mongo_migrate.exceptions import MongoMigrateException
 from mongo_migrate.base_migrate import BaseMigration
 from mongo_migrate.migration_viewer import MigrationViewer
 from mongo_migrate.settings import Config
+from mongo_migrate.utils import TARGET_KEYWORDS, direction_target_is_valid
 
 class MigrationManager(object):
 
@@ -79,20 +80,21 @@ class Migration(BaseMigration):
         if not os.path.exists(self.migrations_path):
             raise MongoMigrateException('Cannot find the migrations path: {}'.format(self.migrations_path))
 
-        if (target == "head" and not direction == "upgrade") or (target == "base" and not direction == "downgrade"):
+        if not direction_target_is_valid(direction, target):
             raise ValueError(f"{direction} {target} is not a viable combination!")
 
         migration_viewer = self.get_migration_viewer()
+        latest_migrated_timestamp = self._get_latest_migrated_timestamp()        
 
-        target_migration = migration_viewer.get_timestamp(target) if target in ["head", "base"] else target
+        target_migration = migration_viewer.get_timestamp(target, latest_migrated_timestamp) if target in TARGET_KEYWORDS else target
 
         if target_migration is not None and not migration_viewer.has_migration(target_migration):
             raise MongoMigrateException(f'Cannot find target migration {target_migration} in the migrations')
 
         if direction == 'upgrade':
-            self._do_upgrade(target_migration)
+            self._do_upgrade(latest_migrated_timestamp, target_migration)
         else:
-            self._do_downgrade(target_migration)
+            self._do_downgrade(latest_migrated_timestamp, target_migration)
 
         print("Migrations completed!")
 
@@ -111,9 +113,9 @@ class Migration(BaseMigration):
 
         print('Migration file created: {}'.format(filename))
 
-    def _do_upgrade(self, target_migration: str):
+    def _do_upgrade(self, latest_migration: str | None, target_migration: str):
         """
-        Upgrade to target migration.
+        Upgrade from latest to target migration.
 
         If this is the first time running an upgrade, initialize migration history.
         Identify the migrations to apply following the latest migrated version (if any)
@@ -128,16 +130,15 @@ class Migration(BaseMigration):
         if not self._get_migration_history_collection():
             self.db.create_collection('migration_history')
 
-        latest_migrated_timestamp = self._get_latest_migrated_timestamp()        
         migration_viewer = self.get_migration_viewer()
 
-        if latest_migrated_timestamp == migration_viewer.last_migration.timestamp:
+        if latest_migration == migration_viewer.last_migration.timestamp:
             print(f"Migrations at head; nothing to upgrade")
             return
 
-        print(f"Upgrade: {latest_migrated_timestamp or '.'} -> {target_migration}")
+        print(f"Upgrade: {latest_migration or '.'} -> {target_migration}")
 
-        migrations_to_apply = migration_viewer.get_migrations_between(latest_migrated_timestamp, target_migration)
+        migrations_to_apply = migration_viewer.get_migrations_between(latest_migration, target_migration)
 
         if len(migrations_to_apply) == 0:
             print("No new changes to apply")
@@ -155,9 +156,9 @@ class Migration(BaseMigration):
             print(f"{migration.previous.basename if migration.previous is not None else '.'} -> {migration.basename}")
 
 
-    def _do_downgrade(self, target_migration):
+    def _do_downgrade(self, latest_migration: str, target_migration: str | None):
         """
-        Downgrade to target migration.
+        Downgrade from latest migration to target migration.
 
         Identify the migrations to apply starting from and preceding the latest migrated version (if any),
             and up to (excluding) the given target migration.
@@ -170,15 +171,14 @@ class Migration(BaseMigration):
         if not self._get_migration_history_collection():
             raise MongoMigrateException("No past migrations found. Cannot perform rollback")
 
-        latest_migrated_timestamp = self._get_latest_migrated_timestamp()
-        if latest_migrated_timestamp is None:
+        if latest_migration is None:
             print(f"Migrations at base; nothing to downgrade")
             return            
 
-        print(f"Downgrade: {latest_migrated_timestamp} -> {target_migration or '.'}")
+        print(f"Downgrade: {latest_migration} -> {target_migration or '.'}")
 
         migration_viewer = self.get_migration_viewer()
-        migrations_to_apply = migration_viewer.get_migrations_between(target_migration, latest_migrated_timestamp)
+        migrations_to_apply = migration_viewer.get_migrations_between(target_migration, latest_migration)
         migrations_to_apply.reverse()
 
         if len(migrations_to_apply) == 0:
