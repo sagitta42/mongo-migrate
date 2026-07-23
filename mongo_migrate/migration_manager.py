@@ -55,8 +55,10 @@ class Migration(BaseMigration):
         all_migrations.sort()
         return all_migrations
 
-    @property
-    def all_migration_timestamps(self) -> list[str]:
+    def get_all_migration_timestamps(self) -> list[str]:
+        """
+        Get list of all migration timestamps.
+        """
         all_migrations_timestamp = list(map(self.timestamp_from_filename, self.all_migrations))
         return all_migrations_timestamp
 
@@ -68,7 +70,7 @@ class Migration(BaseMigration):
         if (direction == "upgrade" and target_migration == "head") or (direction == "downgrade" and target_migration == "base"):
             target_migration = self._get_target_migration_timestamp(direction)
 
-        if target_migration not in self.all_migration_timestamps:
+        if target_migration not in self.get_all_migration_timestamps():
             raise MongoMigrateException('Cannot find target migration in the migrations')
 
         migrate_instance = BaseMigration(self.config)
@@ -108,13 +110,14 @@ class Migration(BaseMigration):
 
         # Identify the migrations to apply to reach the target
         past_migrations = self._get_migration_history()
+        all_migration_timestamps = self.get_all_migration_timestamps()
         if len(past_migrations):
             start_datetime = past_migrations[0]['migration_datetime']
-            start_idx = self.all_migration_timestamps.index(start_datetime) + 1
+            start_idx = all_migration_timestamps.index(start_datetime) + 1
         else:
             start_idx = 0
 
-        last_idx = self.all_migration_timestamps.index(target_migration)
+        last_idx = all_migration_timestamps.index(target_migration)
         migrations_to_apply = self.all_migrations[start_idx: last_idx+1]
 
         if not migrations_to_apply:
@@ -152,9 +155,10 @@ class Migration(BaseMigration):
             raise MongoMigrateException("No past migrations found. Cannot perform rollback")
 
         start_datetime = past_migrations[0]['migration_datetime']
-        start_idx = self.all_migration_timestamps.index(start_datetime)
+        all_migration_timestamps = self.get_all_migration_timestamps()
+        start_idx = all_migration_timestamps.index(start_datetime)
 
-        last_idx = self.all_migration_timestamps.index(target_migration)
+        last_idx = all_migration_timestamps.index(target_migration)
         migrations_to_apply = self.all_migrations[last_idx: start_idx + 1][-1::-1]
 
         if not migrations_to_apply:
@@ -200,8 +204,9 @@ class Migration(BaseMigration):
         Default target migration timestamp is the latest one for upgrade;
             and the first one for downgrade.
         """
+        all_migration_timestamps = self.get_all_migration_timestamps()
         if direction == "upgrade":
-            ret = self.all_migration_timestamps[-1]
+            ret = all_migration_timestamps[-1]
         else:
-            ret = self.all_migration_timestamps[0]
+            ret = all_migration_timestamps[0]
         return ret
