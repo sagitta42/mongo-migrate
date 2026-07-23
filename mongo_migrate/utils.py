@@ -19,4 +19,10 @@ def slugify_message(message: str, truncate_slug_length: int = 40) -> str:
     slug = "_".join(_slug_re.findall(message)).lower()
     if len(slug) > truncate_slug_length:
         slug = slug[:truncate_slug_length].rsplit("_", 1)[0] + "_"
-    return slug    
+    return slug
+
+def timestamp_from_filename(filename: str) -> str:
+    """
+    Extract timestamp from migration filename.
+    """
+    return filename.split('_')[0]
