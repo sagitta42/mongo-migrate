@@ -98,75 +98,73 @@ class SettingsClass(enum.Enum):
 
 
 class SettingsBuilder:
-    def build(self, settings_type: SettingsType, parser: ConfigParser) -> BaseSettings:
-        """
-        Build settings of given type based on .ini parser values
-        """
-        settings_class = SettingsClass.from_settings_type(settings_type).value
-        settings_args = parser[settings_type.value] if settings_type.value in parser.sections() else {}
-        ret = settings_class(**settings_args)
-        return ret
-
-
-class SettingsConstructor:
     """
-    Settings constructor.
+    Settings builder.
 
-    Combines provided argparser arguments with .ini settings.
+    Combines provided argparser arguments with .ini configuration to construct final settubgs.
     """
-    def __init__(self, settings: BaseSettings):
-        self._settings = settings
+    def __init__(self, config_file: str):
+        self._config_file = config_file
 
-    def get_settings(self, args: Namespace | None) -> BaseSettings:
+        self._ini_parser = ConfigParser()
+        self._ini_parser.read(self._config_file)
+
+    def build(self, settings_type: SettingsType, args: Namespace | None) -> BaseSettings:
         """
-        Get settings based on argparse arguments and .ini configuration.
+        Build complete settings of given type based on argparse arguments and .ini configuration.
 
         Each argument must be complementary i.e. either in .ini or argparse (no duplications)
         """
-        init_args = {} if args is None else vars(args)
-        args_settings = self._settings.__class__(**init_args)
+        ini_settings = self._build_ini_settings(settings_type)
+        args_settings = self._build_args_settings(settings_type, args)
 
-        if not args_settings.is_complementary(self._settings):
-            raise ConfigException(f"Provide {', '.join(self._settings.names)} either in .ini or command line arguments")
+        if not args_settings.is_complementary(ini_settings):
+            raise ConfigException(f"Provide {', '.join(ini_settings.names)} either in .ini or command line arguments")
 
-        final_settings = args_settings + self._settings
+        final_settings = args_settings + ini_settings
         return final_settings
 
+    def _build_ini_settings(self, settings_type: SettingsType) -> BaseSettings:
+        """
+        Build settings of given type based on .ini parser values
+        """
+        init_args = self._ini_parser[settings_type.value] if settings_type.value in self._ini_parser.sections() else {}
+        settings_class = SettingsClass.from_settings_type(settings_type).value
+        ret = settings_class(**init_args)
+        return ret
+
+    def _build_args_settings(self, settings_type: SettingsType, args: Namespace | None) -> BaseSettings:
+        """
+        Build settings of given type based on argparse arguments
+        """
+        init_args = {} if args is None else vars(args)
+        settings_class = SettingsClass.from_settings_type(settings_type).value
+        ret = settings_class(**init_args)
+        return ret
 
 
 class SettingsManager:
     """
-    Builder for migration settings.
+    Settings manager for different types of settings.
 
-    Combines provided arguments with .ini settings.
+    Manages database configuration settings and migration settings.
     """
     def __init__(self, config_file: str = "mongomigrate.ini"):
         self._config_file = config_file
 
-        ini_parser = ConfigParser()
-        ini_parser.read(self._config_file)
-
-        settings_builder = SettingsBuilder()
-
-        config_settings = settings_builder.build(SettingsType.database, ini_parser)
-        self._config_constructor = SettingsConstructor(config_settings)
-
-        migration_settings = settings_builder.build(SettingsType.migrations, ini_parser)
-        self._migration_constructor = SettingsConstructor(migration_settings)
+        self._settings_builder = SettingsBuilder(self._config_file)
 
     def get_config(self, args: Namespace | None) -> Config:
         """
-        Build config based on .ini configuration and provided argparse arguments.
+        Get config based on .ini configuration and provided argparse arguments.
         """
-        config_settings = self._config_constructor.get_settings(args)
+        config_settings = self._settings_builder.build(SettingsType.database, args)
         ret = Config(**config_settings.model_dump())
         return ret
 
     def get_migrations(self, args: Namespace | None) -> str:
         """
-        Get migrations folder name based on .ini configuration and provided name.
-
-        Either one or other must be provided.
+        Get migrations folder name based on .ini configuration and provided argparse arguments.
         """
-        migration_settings = self._migration_constructor.get_settings(args)
+        migration_settings = self._settings_builder.build(SettingsType.migrations, args)
         return migration_settings.migrations
