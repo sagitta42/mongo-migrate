@@ -1,6 +1,6 @@
 import re
 
-from mongo_migrate.enums import Direction
+from mongo_migrate.enums import Direction, Target
 
 def is_increment_target(target: str, sign: str) -> bool:
     """
@@ -15,7 +15,7 @@ def is_upgrade_target(target: str) -> bool:
 
     Available keywords: head, +N
     """
-    return target == "head" or is_increment_target(target, "+")
+    return target == Target.head or is_increment_target(target, "+")
 
 
 def is_downgrade_target(target: str) -> bool:
@@ -24,7 +24,7 @@ def is_downgrade_target(target: str) -> bool:
 
     Available keywrods: base, -N
     """
-    return target == "base" or is_increment_target(target, "-")
+    return target == Target.base or is_increment_target(target, "-")
 
 
 def is_keyword_target(target: str) -> bool:

@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Self
 
+from mongo_migrate.enums import BaseFlag, Target
 from mongo_migrate.utils import timestamp_from_filename
 
 
@@ -75,48 +76,43 @@ class MigrationWalker:
         ret = self._migration_map[timestamp]
         return ret
 
-    def get_timestamp(self, key: str, reference_timestamp: str | None) -> str | None:
+    def get_target_timestamp(self, keyword_target: str, reference_timestamp: str | BaseFlag) -> str | BaseFlag:
         """
         Get migration timestamp based on keyword and reference timestamp.
 
-        key (str): head/base/+N/-N
+        keyword_target (str): head/base/+N/-N
 
-        Null reference timestamp means no migrated timestamp (at base)
+        If target is head, last timestamp is returned.
+        If target is base, base is returned (does not correspond to any timestamp).
+        Reference timestamp can be base (no completed migrations)
         """
-        if key == "head":
+        if keyword_target == Target.head:
             return self.last_migration.timestamp
         
-        if key == "base":
-            return None
+        if keyword_target == Target.base:
+            return BaseFlag.base
 
-        if key.startswith("+"):
-            if reference_timestamp is None:
-                return self.last_migration.timestamp
+        if keyword_target.startswith("+"):
+            next_timestamp = self._get_next_timestamp(reference_timestamp, int(keyword_target[1:]))
+            return next_timestamp
 
-            next_migration = self._get_next_migration(reference_timestamp, int(key[1:]))
-            return next_migration.timestamp
+        if keyword_target.startswith("-"):
+            previous_timestamp = self._get_previous_timestamp(reference_timestamp, int(keyword_target[1:]))
+            return previous_timestamp
 
-        if key.startswith("-"):
-            if reference_timestamp is None:
-                return None
-
-            previous_migration = self._get_previous_migration(reference_timestamp, int(key[1:]))
-            if previous_migration is None:
-                return None
-            return previous_migration.timestamp
+        raise ValueError(f"Keyword target {keyword_target} not recognized!")
 
 
-    def get_migrations_between(self, timestamp_from: str | None, timestamp_to: str | None) -> list[Migration]:
+    def get_migrations_between(self, timestamp_from: str | BaseFlag, timestamp_to: str) -> list[Migration]:
         """
         Get migrations between given timestamps.
 
-        To timestamp is included, from timestamp is not.
-            (upgrade or downgrade for from timestamp should not be performed)
-        If start/end timestamp is None, first/last timestamp is included.
+        timestamp_to is included, timestamp_from is not i.e. migrations start from one after timestamp_from.
         """
-        migration_from = self.first_migration if timestamp_from is None else self.get_migration(timestamp_from).next
-        migration_to = self.last_migration if timestamp_to is None else self.get_migration(timestamp_to)
-        timestamps_between = self._get_timestamps_between(migration_from.timestamp, migration_to.timestamp)
+        migration_start = self.first_migration if timestamp_from == BaseFlag.base else self.get_migration(timestamp_from).next or self.last_migration
+        migration_end = self.get_migration(timestamp_to)
+
+        timestamps_between = self._get_timestamps_between(migration_start.timestamp, migration_end.timestamp)
         ret = [self._migration_map[timestamp] for timestamp in timestamps_between]
         return ret
 
@@ -133,36 +129,38 @@ class MigrationWalker:
         return ret
 
 
-    def _get_next_migration(self, reference_timestamp: str, step: int) -> Migration:
+    def _get_next_timestamp(self, reference_timestamp: str | BaseFlag, step: int) -> str:
         """
-        Get migration given number of steps after reference timestamp.
+        Get migration timestamp given number of steps after reference timestamp.
         """
-        if reference_timestamp is None:
-            return self.last_migration
+        # NOTE: assumes start = base and step = 0 never happens
+        if step == 0:
+            return reference_timestamp
         
-        reference_migration = self.get_migration(reference_timestamp)
-        ret = reference_migration
-
-        for _ in range(step+1):
-            next_migration = ret.next
+        if reference_timestamp == BaseFlag.base:
+            next_timestamp = self.first_migration.timestamp
+        else:
+            reference_migration = self.get_migration(reference_timestamp)
+            next_migration = reference_migration.next
             if next_migration is None:
-                return self.last_migration
-            ret = next_migration
-        return ret
+                return self.last_migration.timestamp
+            next_timestamp = next_migration.timestamp
 
+        return self._get_next_timestamp(next_timestamp, step-1)
     
-    def _get_previous_migration(self, reference_timestamp: str, step: int) -> Migration | None:
+    def _get_previous_timestamp(self, reference_timestamp: str | BaseFlag, step: int) -> str | BaseFlag:
         """
         Get migration given number of steps before reference timestamp.
-
-        If steps go over the first migration, return None representing base.
         """
-        reference_migration = self.get_migration(reference_timestamp)
-        ret = reference_migration
+        if step == 0:
+            return reference_timestamp
         
-        for _ in range(step):
-            previous_migration = ret.previous
-            if previous_migration is None:
-                return None
-            ret = previous_migration
-        return ret
+        if reference_timestamp == BaseFlag.base:
+            return BaseFlag.base
+        
+        reference_migration = self.get_migration(reference_timestamp)
+        previous_migration = reference_migration.previous
+        if previous_migration is None:
+            return BaseFlag.base
+
+        return self._get_previous_timestamp(previous_migration.timestamp, step-1)

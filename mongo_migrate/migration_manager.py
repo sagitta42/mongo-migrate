@@ -21,7 +21,7 @@ from string import Template
 import pymongo
 from pymongo.database import Database
 
-from mongo_migrate.enums import Direction
+from mongo_migrate.enums import BaseFlag, Direction
 from mongo_migrate.exceptions import MongoMigrateException
 from mongo_migrate.base_migrate import BaseMigration
 from mongo_migrate.migration_walker import MigrationWalker
@@ -74,6 +74,8 @@ class Migration(BaseMigration):
         """
         Public method to perform the migration - upgrade or downgrade
 
+        target options: timestamp or keyword target (head/base or +N/-N)
+
         Check validity of requested operation (compatibility between direction and target).
         Determine target migration timestamp if not given explicitly (e.g. upgrade head)
         Full downgrade to base means timestamp None to trigger downgrade of the first timestamp as well.
@@ -92,19 +94,19 @@ class Migration(BaseMigration):
         migration_walker = self.get_migration_walker()
         latest_migrated_timestamp = self._get_latest_migrated_timestamp()        
 
-        target_migration = migration_walker.get_timestamp(target, latest_migrated_timestamp) if is_keyword_target(target) else target
+        target_timestamp = migration_walker.get_target_timestamp(target, latest_migrated_timestamp) if is_keyword_target(target) else target
 
-        if target_migration is not None and not migration_walker.has_migration(target_migration):
-            raise MongoMigrateException(f'Cannot find target migration {target_migration} in the migrations')
+        if target_timestamp != BaseFlag.base and not migration_walker.has_migration(target):
+            raise MongoMigrateException(f'Cannot find target migration {target} in the migrations')
 
         if direction == Direction.up:
-            self._do_upgrade(latest_migrated_timestamp, target_migration)
+            self._do_upgrade(latest_migrated_timestamp, target_timestamp)
         else:
-            self._do_downgrade(latest_migrated_timestamp, target_migration)
+            self._do_downgrade(latest_migrated_timestamp, target_timestamp)
 
         print("Migrations completed!")
 
-    def create_migration(self, title, message):
+    def create_migration(self, title: str, message: str):
         """Create the folder and the template migration file."""
         if not os.path.exists(self.migrations_path):
             os.makedirs(self.migrations_path)
@@ -119,7 +121,7 @@ class Migration(BaseMigration):
 
         print('Migration file created: {}'.format(filename))
 
-    def _do_upgrade(self, latest_migration: str | None, target_migration: str):
+    def _do_upgrade(self, latest_migration: str | BaseFlag, target_migration: str):
         """
         Upgrade from latest to target migration.
 
@@ -142,7 +144,7 @@ class Migration(BaseMigration):
             print(f"Migrations at head; nothing to upgrade")
             return
 
-        print(f"Upgrade: {latest_migration or '.'} -> {target_migration}")
+        print(f"Upgrade: {latest_migration} -> {target_migration}")
 
         migrations_to_apply = migration_walker.get_migrations_between(latest_migration, target_migration)
 
@@ -162,7 +164,7 @@ class Migration(BaseMigration):
             print(f"{migration.previous.basename if migration.previous is not None else '.'} -> {migration.basename}")
 
 
-    def _do_downgrade(self, latest_migration: str, target_migration: str | None):
+    def _do_downgrade(self, latest_migration: str | BaseFlag, target_migration: str | BaseFlag):
         """
         Downgrade from latest migration to target migration.
 
@@ -177,11 +179,11 @@ class Migration(BaseMigration):
         if not self._get_migration_history_collection():
             raise MongoMigrateException("No past migrations found. Cannot perform rollback")
 
-        if latest_migration is None:
+        if latest_migration == BaseFlag.base:
             print(f"Migrations at base; nothing to downgrade")
             return            
 
-        print(f"Downgrade: {latest_migration} -> {target_migration or '.'}")
+        print(f"Downgrade: {latest_migration} -> {target_migration}")
 
         migration_walker = self.get_migration_walker()
         migrations_to_apply = migration_walker.get_migrations_between(target_migration, latest_migration)
@@ -221,12 +223,12 @@ class Migration(BaseMigration):
     def _delete_migration_milestone(self, migration_datetime):
         self.db.migration_history.delete_one({'migration_datetime': migration_datetime})
 
-    def _get_latest_migrated_timestamp(self) -> str | None:
+    def _get_latest_migrated_timestamp(self) -> str | BaseFlag:
         """
         Get timestamp of the latest completed migration based on migration history.
 
         If there aren't any completed migrations (no migration history present),
-            return None.
+            return base.
         """
         if not self._get_migration_history_collection():
             raise MongoMigrateException("No migration history found. Cannot perform rollback")
@@ -234,7 +236,7 @@ class Migration(BaseMigration):
         past_migrations = self._get_migration_history()
 
         if len(past_migrations) == 0:
-            return None
+            return BaseFlag.base
         
         ret = past_migrations[0]['migration_datetime']
 
