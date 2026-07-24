@@ -23,11 +23,11 @@ class Migration:
         ret = Path(self.filename).stem
         return ret
 
-class MigrationViewer:
+class MigrationWalker:
     """
-    Migration viewer.
+    Migration walker.
 
-    Facilitates determining relationships between migrations
+    Facilitates walking between migrations
         such as finding first/last/next/previous migration etc.
     """
     def __init__(self, migration_filenames: list[str]) -> None:

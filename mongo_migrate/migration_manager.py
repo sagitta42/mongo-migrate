@@ -23,7 +23,7 @@ from pymongo.database import Database
 
 from mongo_migrate.exceptions import MongoMigrateException
 from mongo_migrate.base_migrate import BaseMigration
-from mongo_migrate.migration_viewer import MigrationViewer
+from mongo_migrate.migration_walker import MigrationWalker
 from mongo_migrate.settings import Config
 from mongo_migrate.utils import direction_target_is_valid, is_keyword_target
 
@@ -50,12 +50,15 @@ class Migration(BaseMigration):
         migrate_instance = BaseMigration(self.config)
         self.db: Database = migrate_instance.db
 
-    def get_migration_viewer(self) -> MigrationViewer:
+    def get_migration_walker(self) -> MigrationWalker:
         """
-        Get migration viewer based on currently present migrations.
+        Get migration walker based on currently present migrations.
+
+        Get list of all migrations at moment of calling this method.
+        Create migration walker based on those migrations.
         """
         all_migrations = self.get_all_migrations()
-        ret = MigrationViewer(all_migrations)
+        ret = MigrationWalker(all_migrations)
         return ret
  
     def get_all_migrations(self) -> list[str]:
@@ -70,7 +73,7 @@ class Migration(BaseMigration):
         """
         Public method to perform the migration - upgrade or downgrade
 
-        Check validity of requested operation.
+        Check validity of requested operation (compatibility between direction and target).
         Determine target migration timestamp if not given explicitly (e.g. upgrade head)
         Full downgrade to base means timestamp None to trigger downgrade of the first timestamp as well.
         Check if given timestamp is present in the history.
@@ -83,12 +86,12 @@ class Migration(BaseMigration):
         if not direction_target_is_valid(direction, target):
             raise ValueError(f"{direction} {target} is not a viable combination!")
 
-        migration_viewer = self.get_migration_viewer()
+        migration_walker = self.get_migration_walker()
         latest_migrated_timestamp = self._get_latest_migrated_timestamp()        
 
-        target_migration = migration_viewer.get_timestamp(target, latest_migrated_timestamp) if is_keyword_target(target) else target
+        target_migration = migration_walker.get_timestamp(target, latest_migrated_timestamp) if is_keyword_target(target) else target
 
-        if target_migration is not None and not migration_viewer.has_migration(target_migration):
+        if target_migration is not None and not migration_walker.has_migration(target_migration):
             raise MongoMigrateException(f'Cannot find target migration {target_migration} in the migrations')
 
         if direction == 'upgrade':
@@ -130,15 +133,15 @@ class Migration(BaseMigration):
         if not self._get_migration_history_collection():
             self.db.create_collection('migration_history')
 
-        migration_viewer = self.get_migration_viewer()
+        migration_walker = self.get_migration_walker()
 
-        if latest_migration == migration_viewer.last_migration.timestamp:
+        if latest_migration == migration_walker.last_migration.timestamp:
             print(f"Migrations at head; nothing to upgrade")
             return
 
         print(f"Upgrade: {latest_migration or '.'} -> {target_migration}")
 
-        migrations_to_apply = migration_viewer.get_migrations_between(latest_migration, target_migration)
+        migrations_to_apply = migration_walker.get_migrations_between(latest_migration, target_migration)
 
         if len(migrations_to_apply) == 0:
             print("No new changes to apply")
@@ -177,8 +180,8 @@ class Migration(BaseMigration):
 
         print(f"Downgrade: {latest_migration} -> {target_migration or '.'}")
 
-        migration_viewer = self.get_migration_viewer()
-        migrations_to_apply = migration_viewer.get_migrations_between(target_migration, latest_migration)
+        migration_walker = self.get_migration_walker()
+        migrations_to_apply = migration_walker.get_migrations_between(target_migration, latest_migration)
         migrations_to_apply.reverse()
 
         if len(migrations_to_apply) == 0:
@@ -208,14 +211,12 @@ class Migration(BaseMigration):
             db_filter = {}
         return list(self.db.migration_history.find(db_filter).sort([('migration_datetime', pymongo.DESCENDING)]))
 
-
     def _create_migration_milestone(self, migration_datetime):
         self.db.migration_history.insert_one({'migration_datetime': migration_datetime,
                                               'created_on': datetime.now()})
 
     def _delete_migration_milestone(self, migration_datetime):
         self.db.migration_history.delete_one({'migration_datetime': migration_datetime})
-        
 
     def _get_latest_migrated_timestamp(self) -> str | None:
         """
