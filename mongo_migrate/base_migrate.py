@@ -21,7 +21,13 @@ from mongo_migrate.config import Config
 
 class BaseMigration(object):
     def __init__(self, config: Config):
-        client = pymongo.MongoClient(host=config.host, port=config.port)
+        client = pymongo.MongoClient(
+            host=config.host,
+            port=config.port,
+            username=config.username,
+            password=config.password,
+            authSource="admin"
+        )
         self.db: Database = client[config.database]
 
     @abstractmethod

@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, Self
 
 
+from mongo_migrate.env import EnvSettings
 from mongo_migrate.exceptions import ConfigException
 
 @dataclass
@@ -139,8 +140,10 @@ class ConfigManager:
     """
     Manager for DB and migration configurations.
 
-    Includes builders for database and migration configurations based on .ini configuration file.
-    Includes getters for database Config and migrations foldername.
+    Includes:
+    - Builders for database and migration configurations based on .ini configuration file.
+    - Environemnt settings
+    - Getters for database Config and migrations foldername.
     """
     def __init__(self, config_file: str = "mongomigrate.ini"):
         self._config_file = config_file
@@ -161,10 +164,12 @@ class ConfigManager:
         Build database config.
         
         Get Config based on .ini configuration and provided argparse arguments.
-        TODO: Get username and password, if any, from environment.
+        Get username and password, if any, from environment.
         """
         db_config = self._db_constructor.get_config(args)
-        ret = Config(**db_config.model_dump())
+        env_settings = EnvSettings()
+        ret = Config(**(db_config.model_dump() | env_settings.model_dump()))
+
         return ret
 
     def get_migrations(self, args: Namespace | None) -> str:
