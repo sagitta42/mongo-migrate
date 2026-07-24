@@ -96,8 +96,8 @@ class Migration(BaseMigration):
 
         target_timestamp = migration_walker.get_target_timestamp(target, latest_migrated_timestamp) if is_keyword_target(target) else target
 
-        if target_timestamp != BaseFlag.base and not migration_walker.has_migration(target):
-            raise MongoMigrateException(f'Cannot find target migration {target} in the migrations')
+        if target_timestamp != BaseFlag.base and not migration_walker.has_migration(target_timestamp):
+            raise MongoMigrateException(f'Cannot find target migration {target_timestamp} in the migrations')
 
         if direction == Direction.up:
             self._do_upgrade(latest_migrated_timestamp, target_timestamp)

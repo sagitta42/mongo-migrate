@@ -58,20 +58,20 @@ def add_migrate_arguments(parser: argparse.ArgumentParser, type: str):
 
 def subparser_for_upgrade(subparsers):
     """Subparser for upgrade command"""
-    upgrade_subparser = subparsers.add_parser(Direction.up, help='upgrade the database to the target migration version')
+    upgrade_subparser = subparsers.add_parser(Direction.up.value, help='upgrade the database to the target migration version')
     upgrade_subparser.set_defaults(func=migrate)
 
     add_common_arguments(upgrade_subparser)
-    add_migrate_arguments(upgrade_subparser, Direction.up)
+    add_migrate_arguments(upgrade_subparser, Direction.up.value)
 
 
 def subparser_for_downgrade(subparsers):
     """Subparser for upgrade command"""
-    upgrade_subparser = subparsers.add_parser(Direction.down, help='downgrade the database to the target migration version')
+    upgrade_subparser = subparsers.add_parser(Direction.down.value, help='downgrade the database to the target migration version')
     upgrade_subparser.set_defaults(func=migrate)
 
     add_common_arguments(upgrade_subparser)
-    add_migrate_arguments(upgrade_subparser, Direction.down)
+    add_migrate_arguments(upgrade_subparser, Direction.down.value)
 
 
 def migrate(args):
