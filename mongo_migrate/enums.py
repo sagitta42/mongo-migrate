@@ -9,6 +9,14 @@ class Target(str, enum.Enum):
     head = "head"
     base = "base"
 
+class DirectionTargetOptions(enum.Enum):
+    up = [Target.head.value, "+N"]
+    down = [Target.base.value, "-N"]
+
+    @classmethod
+    def from_direction(cls, direction: Direction):
+        return cls[direction.name].value
+
 class BaseFlag(str, enum.Enum):
     """
     Flag used to represent base which corresponds to no timestamp.

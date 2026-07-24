@@ -52,8 +52,8 @@ def add_migrate_arguments(parser: argparse.ArgumentParser, type: str):
     """
     Add target migration timestamp argument.
     """
-    parser.add_argument('target_migration', nargs="?", help='target migration timestamp', action='store')
-    parser.add_argument('--upto', help='target migration timestamp', action='store', dest='upto')
+    parser.add_argument('target_migration', nargs="?", help='target migration timestamp or keyword', action='store')
+    parser.add_argument('--upto', help='target migration timestamp or keyword', action='store', dest='upto')
     parser.add_argument('--type', help=argparse.SUPPRESS, action='store', dest='type', default=type)
 
 
@@ -77,12 +77,13 @@ def subparser_for_downgrade(subparsers):
 
 def migrate(args):
     """Entry point for both upgrade and downgrade"""
-    config = settings_manager.get_config(args)
-    migrations = settings_manager.get_migrations(args)
-    m = MigrationManager(config, migrations)
     target_migration = args.target_migration or args.upto
     if target_migration is None:
         raise Exception(f"Provide target migration via positional argument or --upto flag")
+
+    config = settings_manager.get_config(args)
+    migrations = settings_manager.get_migrations(args)
+    m = MigrationManager(config, migrations)
     m.migrate(args.type, target_migration)
 
 
