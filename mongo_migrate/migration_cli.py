@@ -15,6 +15,7 @@
 """
 import argparse
 
+from mongo_migrate.enums import Direction
 from mongo_migrate.settings import SettingsManager
 from mongo_migrate.migration_manager import MigrationManager
 from mongo_migrate.utils import slugify_message
@@ -57,20 +58,20 @@ def add_migrate_arguments(parser: argparse.ArgumentParser, type: str):
 
 def subparser_for_upgrade(subparsers):
     """Subparser for upgrade command"""
-    upgrade_subparser = subparsers.add_parser('upgrade', help='upgrade the database to the target migration version')
+    upgrade_subparser = subparsers.add_parser(Direction.up, help='upgrade the database to the target migration version')
     upgrade_subparser.set_defaults(func=migrate)
 
     add_common_arguments(upgrade_subparser)
-    add_migrate_arguments(upgrade_subparser, "upgrade")
+    add_migrate_arguments(upgrade_subparser, Direction.up)
 
 
 def subparser_for_downgrade(subparsers):
     """Subparser for upgrade command"""
-    upgrade_subparser = subparsers.add_parser('downgrade', help='downgrade the database to the target migration version')
+    upgrade_subparser = subparsers.add_parser(Direction.down, help='downgrade the database to the target migration version')
     upgrade_subparser.set_defaults(func=migrate)
 
     add_common_arguments(upgrade_subparser)
-    add_migrate_arguments(upgrade_subparser, "downgrade")
+    add_migrate_arguments(upgrade_subparser, Direction.down)
 
 
 def migrate(args):

@@ -21,6 +21,7 @@ from string import Template
 import pymongo
 from pymongo.database import Database
 
+from mongo_migrate.enums import Direction
 from mongo_migrate.exceptions import MongoMigrateException
 from mongo_migrate.base_migrate import BaseMigration
 from mongo_migrate.migration_walker import MigrationWalker
@@ -69,7 +70,7 @@ class Migration(BaseMigration):
         ret.sort()
         return ret
 
-    def migrate(self, direction: str, target: str):
+    def migrate(self, direction: Direction, target: str):
         """
         Public method to perform the migration - upgrade or downgrade
 
@@ -80,11 +81,13 @@ class Migration(BaseMigration):
         Upgrade or downgrade based on given direction.
         """
 
+        direction = Direction(direction)
+
         if not os.path.exists(self.migrations_path):
             raise MongoMigrateException('Cannot find the migrations path: {}'.format(self.migrations_path))
 
         if not direction_target_is_valid(direction, target):
-            raise ValueError(f"{direction} {target} is not a viable combination!")
+            raise ValueError(f"{direction.value} {target} is not a viable combination!")
 
         migration_walker = self.get_migration_walker()
         latest_migrated_timestamp = self._get_latest_migrated_timestamp()        
@@ -94,7 +97,7 @@ class Migration(BaseMigration):
         if target_migration is not None and not migration_walker.has_migration(target_migration):
             raise MongoMigrateException(f'Cannot find target migration {target_migration} in the migrations')
 
-        if direction == 'upgrade':
+        if direction == Direction.up:
             self._do_upgrade(latest_migrated_timestamp, target_migration)
         else:
             self._do_downgrade(latest_migrated_timestamp, target_migration)

@@ -1,5 +1,7 @@
 import re
 
+from mongo_migrate.enums import Direction
+
 def is_increment_target(target: str, sign: str) -> bool:
     """
     Determine if target is an increment +N or -N
@@ -61,7 +63,7 @@ def timestamp_from_filename(filename: str) -> str:
     return filename.split('_')[0]
 
 
-def direction_target_is_valid(direction: str, target: str) -> bool:
+def direction_target_is_valid(direction: Direction, target: str) -> bool:
     """
     Check validity of direction (upgrade/downgrade) and target (timestamp or keyword).
 
@@ -70,10 +72,10 @@ def direction_target_is_valid(direction: str, target: str) -> bool:
     if not is_keyword_target(target):
         return True
 
-    if is_upgrade_target(target) and not direction == "upgrade":
+    if is_upgrade_target(target) and not direction == Direction.up:
         return False
     
-    if is_downgrade_target(target) and not direction == "downgrade":
+    if is_downgrade_target(target) and not direction == Direction.down:
         return False
 
     return True
