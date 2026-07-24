@@ -25,7 +25,7 @@ from mongo_migrate.exceptions import MongoMigrateException
 from mongo_migrate.base_migrate import BaseMigration
 from mongo_migrate.migration_viewer import MigrationViewer
 from mongo_migrate.settings import Config
-from mongo_migrate.utils import TARGET_KEYWORDS, direction_target_is_valid
+from mongo_migrate.utils import direction_target_is_valid, is_keyword_target
 
 class MigrationManager(object):
 
@@ -86,7 +86,7 @@ class Migration(BaseMigration):
         migration_viewer = self.get_migration_viewer()
         latest_migrated_timestamp = self._get_latest_migrated_timestamp()        
 
-        target_migration = migration_viewer.get_timestamp(target, latest_migrated_timestamp) if target in TARGET_KEYWORDS else target
+        target_migration = migration_viewer.get_timestamp(target, latest_migrated_timestamp) if is_keyword_target(target) else target
 
         if target_migration is not None and not migration_viewer.has_migration(target_migration):
             raise MongoMigrateException(f'Cannot find target migration {target_migration} in the migrations')

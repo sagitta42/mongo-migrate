@@ -79,7 +79,7 @@ class MigrationViewer:
         """
         Get migration timestamp based on keyword and reference timestamp.
 
-        key (str): head/base/+1/-1
+        key (str): head/base/+N/-N
 
         Null reference timestamp means no migrated timestamp (at base)
         """
@@ -89,21 +89,18 @@ class MigrationViewer:
         if key == "base":
             return None
 
-        if key == "+1":
+        if key.startswith("+"):
             if reference_timestamp is None:
-                return self.first_migration.timestamp
-
-            next_migration = self.get_migration(reference_timestamp).next
-            if next_migration is None:
                 return self.last_migration.timestamp
-            
+
+            next_migration = self._get_next_migration(reference_timestamp, int(key[1:]))
             return next_migration.timestamp
 
-        if key == "-1":
+        if key.startswith("-"):
             if reference_timestamp is None:
                 return None
 
-            previous_migration = self.get_migration(reference_timestamp).previous
+            previous_migration = self._get_previous_migration(reference_timestamp, int(key[1:]))
             if previous_migration is None:
                 return None
             return previous_migration.timestamp
@@ -123,6 +120,7 @@ class MigrationViewer:
         ret = [self._migration_map[timestamp] for timestamp in timestamps_between]
         return ret
 
+
     def _get_timestamps_between(self, start_timestamp: str, end_timestamp: str) -> list[str]:
         """
         Get list of timestamps between the given two.
@@ -132,4 +130,39 @@ class MigrationViewer:
         idx_start = self._timestamps.index(start_timestamp)
         idx_end = self._timestamps.index(end_timestamp)
         ret = self._timestamps[idx_start : idx_end + 1]
+        return ret
+
+
+    def _get_next_migration(self, reference_timestamp: str, step: int) -> Migration:
+        """
+        Get migration given number of steps after reference timestamp.
+        """
+        if reference_timestamp is None:
+            return self.last_migration
+        
+        reference_migration = self.get_migration(reference_timestamp)
+        ret = reference_migration
+
+        for _ in range(step+1):
+            next_migration = ret.next
+            if next_migration is None:
+                return self.last_migration
+            ret = next_migration
+        return ret
+
+    
+    def _get_previous_migration(self, reference_timestamp: str, step: int) -> Migration | None:
+        """
+        Get migration given number of steps before reference timestamp.
+
+        If steps go over the first migration, return None representing base.
+        """
+        reference_migration = self.get_migration(reference_timestamp)
+        ret = reference_migration
+        
+        for _ in range(step):
+            previous_migration = ret.previous
+            if previous_migration is None:
+                return None
+            ret = previous_migration
         return ret

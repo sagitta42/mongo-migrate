@@ -1,6 +1,36 @@
 import re
 
-TARGET_KEYWORDS = ["head", "base", "-1", "+1"]
+def is_increment_target(target: str, sign: str) -> bool:
+    """
+    Determine if target is an increment +N or -N
+    """
+    return target.startswith(sign) and target[1:].isnumeric()
+
+
+def is_upgrade_target(target: str) -> bool:
+    """
+    Determine if target is upgrade-compatible keyword.
+
+    Available keywords: head, +N
+    """
+    return target == "head" or is_increment_target(target, "+")
+
+
+def is_downgrade_target(target: str) -> bool:
+    """
+    Determine if target is downgrade-compatible keyword.
+
+    Available keywrods: base, -N
+    """
+    return target == "base" or is_increment_target(target, "-")
+
+
+def is_keyword_target(target: str) -> bool:
+    """
+    Determine if target is a keyword.
+    """
+    return is_upgrade_target(target) or is_downgrade_target(target)
+
 
 def slugify_message(message: str, truncate_slug_length: int = 40) -> str:
     """
@@ -23,29 +53,27 @@ def slugify_message(message: str, truncate_slug_length: int = 40) -> str:
         slug = slug[:truncate_slug_length].rsplit("_", 1)[0] + "_"
     return slug
 
+
 def timestamp_from_filename(filename: str) -> str:
     """
     Extract timestamp from migration filename.
     """
     return filename.split('_')[0]
 
+
 def direction_target_is_valid(direction: str, target: str) -> bool:
     """
-    Check validity of direction (upgrade/downgrade) and target (timestamp/head/base/+1/-1/...).
+    Check validity of direction (upgrade/downgrade) and target (timestamp or keyword).
 
     Timestamp is a valid target for all cases.
-    head or +1 is only valid for upgrade
-    base or -1 is only valid for downgrade
     """
-    if not target in TARGET_KEYWORDS:
+    if not is_keyword_target(target):
         return True
-    
-    upgrade_only_target = target in ["head", "+1"]
-    if upgrade_only_target and not direction == "upgrade":
-        return False
 
-    downgrade_only_target = target in ["base", "-1"]
-    if downgrade_only_target and not direction == "downgrade":
+    if is_upgrade_target(target) and not direction == "upgrade":
+        return False
+    
+    if is_downgrade_target(target) and not direction == "downgrade":
         return False
 
     return True
