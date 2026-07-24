@@ -101,39 +101,49 @@ class ConfigClass(enum.Enum):
 
 
 class ConfigBuilder:
-    def build(self, config_type: ConfigType, parser: ConfigParser) -> BaseConfig:
-        """
-        Build configuration of given type based on .ini parser values
-        """
-        config_class = ConfigClass.from_config_type(config_type).value
-        config_args = parser[config_type.value] if config_type.value in parser.sections() else {}
-        ret = config_class(**config_args)
-        return ret
-
-
-class ConfigConstructor:
     """
-    Configuration constructor.
+    Configuration builder.
 
-    Combines provided argparser arguments with .ini configuration to construct final config.
+    Combines provided argparser arguments with .ini configuration to construct final configuration.
     """
-    def __init__(self, config: BaseConfig):
-        self._config = config
+    def __init__(self, config_file: str):
+        self._config_file = config_file
 
-    def get_config(self, args: Namespace | None) -> BaseConfig:
+        self._ini_parser = ConfigParser()
+        self._ini_parser.read(self._config_file)
+
+    def build(self, config_type: ConfigType, args: Namespace | None) -> BaseConfig:
         """
-        Get complete configuration based on argparse arguments and .ini configuration.
+        Build complete configuration of given type based on argparse arguments and .ini configuration.
 
         Each argument must be complementary i.e. either in .ini or argparse (no duplications)
         """
-        init_args = {} if args is None else vars(args)
-        args_config = self._config.__class__(**init_args)
+        ini_config = self._build_ini_config(config_type)
+        args_config = self._build_args_config(config_type, args)
 
-        if not args_config.is_complementary(self._config):
-            raise ConfigException(f"Provide {', '.join(self._config.names)} either in .ini or command line arguments")
+        if not args_config.is_complementary(ini_config):
+            raise ConfigException(f"Provide {', '.join(ini_config.names)} either in .ini or command line arguments")
 
-        final_config = args_config + self._config
+        final_config = args_config + ini_config
         return final_config
+
+    def _build_ini_config(self, config_type: ConfigType) -> BaseConfig:
+        """
+        Build configuration of given type based on .ini parser values
+        """
+        init_args = self._ini_parser[config_type.value] if config_type.value in self._ini_parser.sections() else {}
+        config_class = ConfigClass.from_config_type(config_type).value
+        ret = config_class(**init_args)
+        return ret
+    
+    def _build_args_config(self, config_type: ConfigType, args: Namespace | None) -> BaseConfig:
+        """
+        Build configuration of given type based on argparse arguments
+        """
+        init_args = {} if args is None else vars(args)
+        config_class = ConfigClass.from_config_type(config_type).value
+        ret = config_class(**init_args)
+        return ret
 
 
 class ConfigManager:
@@ -148,16 +158,7 @@ class ConfigManager:
     def __init__(self, config_file: str = "mongomigrate.ini"):
         self._config_file = config_file
 
-        ini_parser = ConfigParser()
-        ini_parser.read(self._config_file)
-
-        config_builder = ConfigBuilder()
-
-        db_config = config_builder.build(ConfigType.database, ini_parser)
-        self._db_constructor = ConfigConstructor(db_config)
-
-        migration_config = config_builder.build(ConfigType.migrations, ini_parser)
-        self._migration_constructor = ConfigConstructor(migration_config)
+        self._config_builder = ConfigBuilder(self._config_file)
 
     def get_config(self, args: Namespace | None) -> Config:
         """
@@ -166,7 +167,7 @@ class ConfigManager:
         Get Config based on .ini configuration and provided argparse arguments.
         Get username and password, if any, from environment.
         """
-        db_config = self._db_constructor.get_config(args)
+        db_config = self._config_builder.build(ConfigType.database, args)
         env_settings = EnvSettings()
         ret = Config(**(db_config.model_dump() | env_settings.model_dump()))
 
@@ -178,5 +179,5 @@ class ConfigManager:
 
         Either one or other must be provided.
         """
-        migration_config = self._migration_constructor.get_config(args)
+        migration_config = self._config_builder.build(ConfigType.migrations, args)
         return migration_config.migrations
