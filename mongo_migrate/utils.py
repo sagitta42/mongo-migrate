@@ -1,4 +1,5 @@
 import re
+from typing import Any, Iterable
 
 from mongo_migrate.enums import Direction, Target
 
@@ -87,3 +88,14 @@ def direction_target_is_valid(direction: Direction, target: str) -> bool:
         return False
 
     return True
+
+def values_are_complete(values: Iterable[Any]) -> bool:
+    """
+    Check if values are complete.
+
+    Complete means all values are not null.
+    """
+    for value in values:
+        if value is None:
+            return False
+    return True        
