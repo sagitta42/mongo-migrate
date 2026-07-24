@@ -231,7 +231,7 @@ class Migration(BaseMigration):
             return base.
         """
         if not self._get_migration_history_collection():
-            raise MongoMigrateException("No migration history found. Cannot perform rollback")
+            return BaseFlag.base
           
         past_migrations = self._get_migration_history()
 
