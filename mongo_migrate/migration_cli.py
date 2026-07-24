@@ -15,7 +15,7 @@
 """
 import argparse
 
-from mongo_migrate.enums import Direction
+from mongo_migrate.enums import Direction, DirectionTargetOptions
 from mongo_migrate.settings import SettingsManager
 from mongo_migrate.migration_manager import MigrationManager
 from mongo_migrate.utils import slugify_message
@@ -52,8 +52,9 @@ def add_migrate_arguments(parser: argparse.ArgumentParser, type: str):
     """
     Add target migration timestamp argument.
     """
-    parser.add_argument('target_migration', nargs="?", help='target migration timestamp or keyword', action='store')
-    parser.add_argument('--upto', help='target migration timestamp or keyword', action='store', dest='upto')
+    target_migration_help = f"target migration timestamp or keyword (options: {', '.join(DirectionTargetOptions.from_direction(type))})"
+    parser.add_argument('target_migration', nargs="?", help=target_migration_help, action='store')
+    parser.add_argument('--upto', help=target_migration_help, action='store', dest='upto')
     parser.add_argument('--type', help=argparse.SUPPRESS, action='store', dest='type', default=type)
 
 

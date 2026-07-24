@@ -15,6 +15,7 @@ class DirectionTargetOptions(enum.Enum):
 
     @classmethod
     def from_direction(cls, direction: Direction):
+        direction = Direction(direction)
         return cls[direction.name].value
 
 class BaseFlag(str, enum.Enum):
