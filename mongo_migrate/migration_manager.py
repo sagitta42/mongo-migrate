@@ -89,7 +89,7 @@ class Migration(BaseMigration):
             raise MongoMigrateException('Cannot find the migrations path: {}'.format(self.migrations_path))
 
         if not direction_target_is_valid(direction, target):
-            raise ValueError(f"{direction.value} {target} is not a viable combination!\nOptions: {', '.join(DirectionTargetOptions.from_direction(direction) + ['timestamp (YYYYMMDDhhmmss)'])}")
+            raise MongoMigrateException(f"{direction.value} {target} is not a viable combination!\nOptions: {', '.join(DirectionTargetOptions.from_direction(direction) + ['timestamp (YYYYMMDDhhmmss)'])}")
 
         migration_walker = self.get_migration_walker()
         latest_migrated_timestamp = self._get_latest_migrated_timestamp()        

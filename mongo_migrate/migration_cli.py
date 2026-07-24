@@ -16,6 +16,7 @@
 import argparse
 
 from mongo_migrate.enums import Direction, DirectionTargetOptions
+from mongo_migrate.exceptions import MongoMigrateException
 from mongo_migrate.settings import SettingsManager
 from mongo_migrate.migration_manager import MigrationManager
 from mongo_migrate.utils import slugify_message
@@ -80,7 +81,7 @@ def migrate(args):
     """Entry point for both upgrade and downgrade"""
     target_migration = args.target_migration or args.upto
     if target_migration is None:
-        raise Exception(f"Provide target migration via positional argument or --upto flag")
+        raise MongoMigrateException(f"Provide target migration via positional argument or --upto flag")
 
     config = settings_manager.get_config(args)
     migrations = settings_manager.get_migrations(args)
@@ -101,7 +102,7 @@ def parse_arguments():
     args = parser.parse_args()
     try:
         args.func(args)
-    except Exception as e:
+    except MongoMigrateException as e:
         parser.error(str(e))
 
 
