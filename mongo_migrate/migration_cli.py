@@ -17,11 +17,11 @@ import argparse
 
 from mongo_migrate.enums import Direction, DirectionTargetOptions
 from mongo_migrate.exceptions import MongoMigrateException
-from mongo_migrate.settings import SettingsManager
+from mongo_migrate.config import ConfigManager
 from mongo_migrate.migration_manager import MigrationManager
 from mongo_migrate.utils import slugify_message
 
-settings_manager = SettingsManager()
+config_manager = ConfigManager()
 
 def add_common_arguments(parser: argparse.ArgumentParser):
     """Common parser arguments"""
@@ -44,8 +44,8 @@ def subparser_for_create(subparsers):
 
 def create_migration(args):
     """Entry point for create migration command"""
-    config = settings_manager.get_config(args)
-    migrations = settings_manager.get_migrations(args)
+    config = config_manager.get_config(args)
+    migrations = config_manager.get_migrations(args)
     m = MigrationManager(config, migrations)
     m.create_migration(args.title or slugify_message(args.message), args.message)
 
@@ -83,8 +83,8 @@ def migrate(args):
     if target_migration is None:
         raise MongoMigrateException(f"Provide target migration via positional argument or --upto flag")
 
-    config = settings_manager.get_config(args)
-    migrations = settings_manager.get_migrations(args)
+    config = config_manager.get_config(args)
+    migrations = config_manager.get_migrations(args)
     m = MigrationManager(config, migrations)
     m.migrate(args.type, target_migration)
 

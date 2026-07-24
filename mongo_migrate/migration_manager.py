@@ -25,7 +25,7 @@ from mongo_migrate.enums import BaseFlag, Direction, DirectionTargetOptions
 from mongo_migrate.exceptions import MongoMigrateException
 from mongo_migrate.base_migrate import BaseMigration
 from mongo_migrate.migration_walker import MigrationWalker
-from mongo_migrate.settings import Config
+from mongo_migrate.config import Config
 from mongo_migrate.utils import direction_target_is_valid, is_keyword_target
 
 class MigrationManager(object):
