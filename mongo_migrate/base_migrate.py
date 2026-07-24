@@ -21,9 +21,7 @@ from mongo_migrate.settings import Config
 
 class BaseMigration(object):
     def __init__(self, config: Config):
-        mongo_uri = 'mongodb://%s:%s'       # Current version supports only simple db mechanism.
-
-        client = pymongo.MongoClient(mongo_uri % (config.host, config.port))
+        client = pymongo.MongoClient(host=config.host, port=config.port)
         self.db: Database = client[config.database]
 
     @abstractmethod
