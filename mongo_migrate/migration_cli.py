@@ -52,7 +52,8 @@ def add_migrate_arguments(parser: argparse.ArgumentParser, type: str):
     """
     Add target migration timestamp argument.
     """
-    parser.add_argument('target_migration', help='target migration timestamp', action='store')
+    parser.add_argument('target_migration', nargs="?", help='target migration timestamp', action='store')
+    parser.add_argument('--upto', help='target migration timestamp', action='store', dest='upto')
     parser.add_argument('--type', help=argparse.SUPPRESS, action='store', dest='type', default=type)
 
 
@@ -79,7 +80,10 @@ def migrate(args):
     config = settings_manager.get_config(args)
     migrations = settings_manager.get_migrations(args)
     m = MigrationManager(config, migrations)
-    m.migrate(args.type, args.target_migration)
+    target_migration = args.target_migration or args.upto
+    if target_migration is None:
+        raise Exception(f"Provide target migration via positional argument or --upto flag")
+    m.migrate(args.type, target_migration)
 
 
 def parse_arguments():
@@ -93,7 +97,10 @@ def parse_arguments():
 
     # Generic parse call
     args = parser.parse_args()
-    args.func(args)
+    try:
+        args.func(args)
+    except Exception as e:
+        parser.error(str(e))
 
 
 def main():
