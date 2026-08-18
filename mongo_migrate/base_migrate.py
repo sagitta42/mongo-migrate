@@ -11,6 +11,8 @@
     Created on: 15-08-2023
     
 """
+from datetime import datetime
+
 import pymongo
 from abc import abstractmethod
 
@@ -45,3 +47,18 @@ class BaseMigration(object):
         """Implement this in the child classes"""
         pass
 
+    def add_timestamps(self, doc: dict, created: bool) -> dict:
+        """
+        Add created/updated at timestamps to given document.
+        """
+        ret = doc.copy()
+
+        now = datetime.now()
+        time_keys = ["updated"]
+        if created:
+            time_keys.append("created")
+
+        for key in time_keys:
+            ret[f"{key}_at"] = now
+
+        return ret
