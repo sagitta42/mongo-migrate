@@ -8,3 +8,4 @@ class EnvSettings(BaseSettings):
     port: int | None = Field(default=None, alias="MONGO_PORT")
     username: str | None = Field(default=None, alias="MONGO_INITDB_ROOT_USERNAME")
     password: str | None = Field(default=None, alias="MONGO_INITDB_ROOT_PASSWORD")
+    database: str | None = Field(default=None, alias="MONGO_DB_NAME")
