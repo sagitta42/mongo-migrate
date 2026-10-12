@@ -9,21 +9,25 @@ from mongo_migrate.env import EnvSettings
 from mongo_migrate.exceptions import ConfigException
 from mongo_migrate.utils import values_are_complete
 
+
 @dataclass
 class Config:
     """
     Database configuration
     """
+
     host: str
     port: int
     database: str
     username: str | None = None
     password: str | None = None
 
+
 class BaseConfig(BaseModel):
     """
     Base parent class for configurations
     """
+
     model_config = ConfigDict(extra="ignore")
 
     @property
@@ -55,11 +59,13 @@ class BaseConfig(BaseModel):
         other_model = other.model_dump()
         for field_name, field_value in self.model_dump().items():
             other_value = other_model[field_name]
-            field_is_not_complementary = field_value is not None and other_value is not None
+            field_is_not_complementary = (
+                field_value is not None and other_value is not None
+            )
             if field_is_not_complementary:
                 return False
 
-        return True    
+        return True
 
     def __add__(self, other):
         """
@@ -80,6 +86,7 @@ class DBConfig(BaseConfig):
     """
     Settings for database configuration
     """
+
     host: Optional[str] = None
     port: Optional[int] = None
     database: Optional[str] = None
@@ -99,11 +106,11 @@ class DBConfig(BaseConfig):
         return ret
 
 
-
 class MigrationConfig(BaseConfig):
     """
     Migrations configuration.
     """
+
     migrations: Optional[str] = Field(None, description="Migrations folder name")
 
 
@@ -113,6 +120,7 @@ class ConfigType(str, enum.Enum):
 
     Value corresponds to section name in .ini file.
     """
+
     database = "database"
     migrations = "migrations"
 
@@ -130,6 +138,7 @@ class ConfigBuilder:
     """
     Configuration builder.
     """
+
     def __init__(self, config_file: str):
         self._config_file = config_file
 
@@ -139,7 +148,7 @@ class ConfigBuilder:
     def build(self, config_type: ConfigType, args: Namespace | None) -> BaseConfig:
         """
         Build complete configuration of given type.
-         
+
         Combine settings based on:
         - argparse arguments
         - .ini configuration
@@ -147,17 +156,29 @@ class ConfigBuilder:
 
         Each argument must be complementary i.e. either in one source or another (no duplications)
         """
-        ini_config = self._build_ini_config(config_type)
-        args_config = self._build_args_config(config_type, args)
-        env_config = self._build_env_config(config_type)
+        configs = {
+            "CLI": self._build_args_config(config_type, args),
+            ".ini": self._build_ini_config(config_type),
+            ".env": self._build_env_config(config_type),
+        }
 
-        for config in [args_config, env_config]:
-            if not config.is_complementary(ini_config):
-                raise ConfigException(f"Provide {', '.join(ini_config.names)} either in .ini, or .env, or command line arguments")
+        config_pairs = [("CLI", ".ini"), ("CLI", ".env"), (".ini", ".env")]
 
-        final_config = args_config + ini_config + env_config
+        for config1, config2 in config_pairs:
+            if not configs[config1].is_complementary(configs[config2]):
+                raise ConfigException(
+                    ConfigException.error_message(
+                        f"{config1} and {config2} not complementary",
+                        configs[config1],
+                        configs[config2],
+                    ),
+                )
+
+        final_config = configs["CLI"] + configs[".ini"] + configs[".env"]
         if not final_config.is_complete:
-            raise ConfigException(f"Provide {', '.join(ini_config.names)} either in .ini, or .env, or command line arguments")
+            raise ConfigException(
+                ConfigException.error_message("incomplete", final_config)
+            )
 
         return final_config
 
@@ -165,10 +186,16 @@ class ConfigBuilder:
         """
         Build configuration of given type based on .ini parser values
         """
-        init_args = self._ini_parser[config_type.value] if config_type.value in self._ini_parser.sections() else {}
+        init_args = (
+            self._ini_parser[config_type.value]
+            if config_type.value in self._ini_parser.sections()
+            else {}
+        )
         return self._build_config(config_type, init_args)
-    
-    def _build_args_config(self, config_type: ConfigType, args: Namespace | None) -> BaseConfig:
+
+    def _build_args_config(
+        self, config_type: ConfigType, args: Namespace | None
+    ) -> BaseConfig:
         """
         Build configuration of given type based on argparse arguments
         """
@@ -183,13 +210,16 @@ class ConfigBuilder:
         init_args = env_settings.model_dump(by_alias=False)
         return self._build_config(config_type, init_args)
 
-    def _build_config(self, config_type: ConfigType, init_args: dict[str, Any]) -> BaseConfig:
+    def _build_config(
+        self, config_type: ConfigType, init_args: dict[str, Any]
+    ) -> BaseConfig:
         """
         Build configuration of given type with class init arguments.
         """
         config_class = ConfigClass.from_config_type(config_type).value
         ret = config_class(**init_args)
         return ret
+
 
 class ConfigManager:
     """
@@ -202,6 +232,7 @@ class ConfigManager:
 
     and get desired parameters.
     """
+
     def __init__(self, config_file: str = "mongomigrate.ini"):
         self._config_file = config_file
 
