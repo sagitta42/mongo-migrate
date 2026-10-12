@@ -25,9 +25,11 @@ config_manager = ConfigManager()
 
 def add_common_arguments(parser: argparse.ArgumentParser):
     """Common parser arguments"""
-    parser.add_argument('--host', help='the database host (overrides .env)', default=None, action='store', dest='host')
-    parser.add_argument('--port', help='the database port (overrides .env)', default=None, action='store', dest='port')
-    parser.add_argument('--database', help='the database name (overrides .env)', default=None, action='store', dest='database')
+    parser.add_argument('--host', help='the database host', default=None, action='store', dest='host')
+    parser.add_argument('--port', help='the database port', default=None, action='store', dest='port')
+    parser.add_argument('--username', help='the database user', default=None, action='store', dest='username')
+    parser.add_argument('--password', help='the database user', default=None, action='store', dest='password')
+    parser.add_argument('--database', help='the database name', default=None, action='store', dest='database')
     parser.add_argument('--migrations', help='provide the folder to store migrations. By default creates migrations/', default=None, action='store', dest='migrations')    
 
 
