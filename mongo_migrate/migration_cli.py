@@ -27,8 +27,6 @@ def add_common_arguments(parser: argparse.ArgumentParser):
     """Common parser arguments"""
     parser.add_argument('--host', help='the database host', default=None, action='store', dest='host')
     parser.add_argument('--port', help='the database port', default=None, action='store', dest='port')
-    parser.add_argument('--username', help='the database user', default=None, action='store', dest='username')
-    parser.add_argument('--password', help='the database user', default=None, action='store', dest='password')
     parser.add_argument('--database', help='the database name', default=None, action='store', dest='database')
     parser.add_argument('--migrations', help='provide the folder to store migrations. By default creates migrations/', default=None, action='store', dest='migrations')    
 
@@ -59,7 +57,8 @@ def add_migrate_arguments(parser: argparse.ArgumentParser, type: str):
     parser.add_argument('target_migration', nargs="?", help=target_migration_help, action='store')
     parser.add_argument('--upto', help=target_migration_help, action='store', dest='upto')
     parser.add_argument('--type', help=argparse.SUPPRESS, action='store', dest='type', default=type)
-
+    parser.add_argument('--username', help='the database user', default=None, action='store', dest='username')
+    parser.add_argument('--password', help='the database user', default=None, action='store', dest='password')
 
 def subparser_for_upgrade(subparsers):
     """Subparser for upgrade command"""
