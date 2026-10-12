@@ -17,7 +17,7 @@ class MongoMigrateException(BaseException):
     pass
 
 
-class ConfigException(BaseException):
+class ConfigException(MongoMigrateException):
     @classmethod
     def error_message(
         cls, header: str, config1: BaseModel, config2: BaseModel | None = None
