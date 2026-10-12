@@ -2,6 +2,7 @@ from argparse import Namespace
 from configparser import ConfigParser
 from dataclasses import dataclass
 import enum
+from pathlib import Path
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Any, Optional, Self
 
@@ -51,6 +52,9 @@ class BaseConfig(BaseModel):
         """
         Check if given configuration is complementary.
 
+        Args:
+            other (BaseConfig): another BaseConfig to check complementarity with
+
         Complementary means that each field is not non-null in both.
         (both null; or either one or the other null)
         """
@@ -65,9 +69,12 @@ class BaseConfig(BaseModel):
 
         return True
 
-    def __add__(self, other):
+    def __add__(self, other: Self):
         """
         Combine two configurations.
+
+        Args:
+            other (BaseConfig): another BaseConfig to combine with current
 
         Null fields take value of other, non-null stay as is.
         """
@@ -107,7 +114,7 @@ class MigrationConfig(BaseConfig):
     Migrations configuration.
     """
 
-    migrations: Optional[str] = Field(None, description="Migrations folder name")
+    migrations: Optional[Path] = Field(None, description="Migrations folder path")
 
 
 class ConfigType(str, enum.Enum):
@@ -135,22 +142,32 @@ class ConfigBuilder:
     Configuration builder.
     """
 
-    def __init__(self, config_file: str):
-        self._config_file = config_file
-
+    def __init__(self, config_file: Path):
+        """
+        Args:
+            config_file (Path): path to .ini configuration file for mongo-migrate
+        """
         self._ini_parser = ConfigParser()
-        self._ini_parser.read(self._config_file)
+        self._ini_parser.read(config_file)
 
     def build(self, config_type: ConfigType, args: Namespace | None) -> BaseConfig:
         """
         Build complete configuration of given type.
 
-        Combine settings based on:
-        - argparse arguments
-        - .ini configuration
-        - .env
+        Args:
+            config_type (ConfigType): type of configuration to build
+            args (Namespace | None): (optional) argparse arguments Namespace obtained from CLI call
 
-        Each argument must be complementary i.e. either in one source or another (no duplications)
+        Returns:
+            BaseConfig: Configuration for given configuration type.
+
+        Combine settings based on:
+        - argparse arguments from CLI
+        - .ini configuration
+        - .env configuration
+
+        Each argument must be complementary i.e. either in one source or another (no duplications).
+        Final configuration must be complete (not missing non-optional fields).
         """
         configs = {
             "CLI": self._build_args_config(config_type, args),
@@ -180,7 +197,13 @@ class ConfigBuilder:
 
     def _build_ini_config(self, config_type: ConfigType) -> BaseConfig:
         """
-        Build configuration of given type based on .ini parser values
+        Build configuration of given type based on .ini parser values.
+
+        Args:
+            config_type (ConfigType): type of configuration to build
+
+        Returns:
+            BaseConfig: Configuration for given configuration type.            
         """
         init_args = (
             self._ini_parser[config_type.value]
@@ -193,27 +216,47 @@ class ConfigBuilder:
         self, config_type: ConfigType, args: Namespace | None
     ) -> BaseConfig:
         """
-        Build configuration of given type based on argparse arguments
+        Build configuration of given type based on argparse arguments.
+
+        Args:
+            config_type (ConfigType): type of configuration to build        
+            args (Namespace | None): (optional) argparse arguments Namespace obtained from CLI call
+
+        Returns:
+            BaseConfig: Configuration for given configuration type.            
         """
         init_args = {} if args is None else vars(args)
         return self._build_config(config_type, init_args)
 
     def _build_env_config(self, config_type: ConfigType) -> BaseConfig:
         """
-        Build configuration of given type based on .env
+        Build configuration of given type based on .env.
+
+        Args:
+            config_type (ConfigType): type of configuration to build  
+
+        Returns:
+            BaseConfig: Configuration for given configuration type.                       
         """
         env_settings = EnvSettings()
         init_args = env_settings.model_dump(by_alias=False)
         return self._build_config(config_type, init_args)
 
     def _build_config(
-        self, config_type: ConfigType, init_args: dict[str, Any]
+        self, config_type: ConfigType, config_params: dict[str, Any]
     ) -> BaseConfig:
         """
-        Build configuration of given type with class init arguments.
+        Build configuration.
+
+        Args:
+            config_type (ConfigType): type of configuration to build    
+            config_params (dict[str, Any]): values for configuration parameters
+
+        Returns:
+            BaseConfig: Configuration for given configuration type.            
         """
         config_class = ConfigClass.from_config_type(config_type).value
-        ret = config_class(**init_args)
+        ret = config_class(**config_params)
         return ret
 
 
@@ -221,29 +264,38 @@ class ConfigManager:
     """
     Manager for DB and migration configurations.
 
-    Combine settings based on:
-        - argparse arguments
-        - .ini configuration
-        - .env
-
-    and get desired parameters.
+    Builds configurations based on argparse arguments from CLI, .ini and .env inputs.
     """
 
-    def __init__(self, config_file: str = "mongomigrate.ini"):
-        self._config_file = config_file
-
-        self._config_builder = ConfigBuilder(self._config_file)
+    def __init__(self, config_file: Path = Path("mongomigrate.ini")):
+        """
+        Args:
+            config_file (Path): path to .ini configuration file for mongo-migrate
+        """        
+        self._config_builder = ConfigBuilder(config_file)
 
     def get_config(self, args: Namespace | None) -> Config:
         """
         Build database config.
+
+        Args:
+            args (Namespace | None): (optional) argparse arguments Namespace obtained from CLI call
+
+        Returns:
+            Config: Databse configuration 
         """
         ret = self._config_builder.build(ConfigType.database, args)
         return ret
 
-    def get_migrations(self, args: Namespace | None) -> str:
+    def get_migrations(self, args: Namespace | None) -> Path:
         """
-        Get migrations folder name.
+        Get migrations folder.
+
+        Args:
+            args (Namespace | None): (optional) argparse arguments Namespace obtained from CLI call
+
+        Returns:
+            Path: path to migrations folder.
         """
         migration_config = self._config_builder.build(ConfigType.migrations, args)
         return migration_config.migrations

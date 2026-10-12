@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Self
 
-from mongo_migrate.enums import BaseFlag, Target
+from mongo_migrate.enums import BaseFlag, Target, Timestamp
 from mongo_migrate.utils import timestamp_from_filename
 
 
@@ -13,7 +13,7 @@ class Migration:
     next: Self | None
 
     @property
-    def timestamp(self) -> str:
+    def timestamp(self) -> Timestamp:
         """ Migration timestamp """
         ret = timestamp_from_filename(self.filename)
         return ret
@@ -33,6 +33,9 @@ class MigrationWalker:
     """
     def __init__(self, migration_filenames: list[str]) -> None:
         """
+        Args:
+            migration_filenames (list[str]): migration .py file names
+
         Populate list of disconnected migrations.
         Connect migrations among each other by establishing previous and next migrations.
         Map migrations to timestamps.
@@ -62,29 +65,39 @@ class MigrationWalker:
     def first_migration(self) -> Migration:
         return self._migrations[0]
 
-    def has_migration(self, timestamp: str) -> bool:
+    def has_migration(self, timestamp: Timestamp) -> bool:
         """
         Whether migration with given timestamp is present.
+
+        Args:
+            timestamp (str): timestamp in format YYYYMMDDhhmmss
         """
         ret = timestamp in self._migration_map
         return ret
 
-    def get_migration(self, timestamp: str) -> Migration:
+    def get_migration(self, timestamp: Timestamp) -> Migration:
         """
         Get migration by timestamp.
+
+        Args:
+            timestamp (str): timestamp in format YYYYMMDDhhmmss        
         """
         ret = self._migration_map[timestamp]
         return ret
 
-    def get_target_timestamp(self, keyword_target: str, reference_timestamp: str | BaseFlag) -> str | BaseFlag:
+    def get_target_timestamp(self, keyword_target: str, reference_timestamp: Timestamp | BaseFlag) -> Timestamp | BaseFlag:
         """
         Get migration timestamp based on keyword and reference timestamp.
 
-        keyword_target (str): head/base/+N/-N
+        Args:
+            keyword_target (str): head/base/+N/-N
+            reference_timestamp (str | BaseFlag): reference timestamp for +/-N target, YYYYMMDDhhmmss or BaseFlag to in dicate no completed migrations
+
+        Returns:
+            Timestamp in YYYYMMDDhhmmss format of given target relative to reference timestamp.
 
         If target is head, last timestamp is returned.
         If target is base, base is returned (does not correspond to any timestamp).
-        Reference timestamp can be base (no completed migrations)
         """
         if keyword_target == Target.head:
             return self.last_migration.timestamp
@@ -102,10 +115,13 @@ class MigrationWalker:
 
         raise ValueError(f"Keyword target {keyword_target} not recognized!")
 
-
-    def get_migrations_between(self, timestamp_from: str | BaseFlag, timestamp_to: str) -> list[Migration]:
+    def get_migrations_between(self, timestamp_from: Timestamp | BaseFlag, timestamp_to: Timestamp) -> list[Migration]:
         """
         Get migrations between given timestamps.
+
+        Args:
+            timestamp_from (Timestamp | BaseFlag): timestamp in format YYYYMMDDhhmmss or BaseFlag to indicate no completed migrations
+            timestamp_to (Timestamp): timestamp in format YYYYMMDDhhmmss
 
         timestamp_to is included, timestamp_from is not i.e. migrations start from one after timestamp_from.
         """
@@ -116,10 +132,13 @@ class MigrationWalker:
         ret = [self._migration_map[timestamp] for timestamp in timestamps_between]
         return ret
 
-
-    def _get_timestamps_between(self, start_timestamp: str, end_timestamp: str) -> list[str]:
+    def _get_timestamps_between(self, start_timestamp: Timestamp, end_timestamp: Timestamp) -> list[Timestamp]:
         """
-        Get list of timestamps between the given two.
+        Get list of timestamps YYYYMMDDhhmmss between the given two.
+
+        Args:
+            start_timestamp (Timestamp): timestamp in format YYYYMMDDhhmmss        
+            end_timestamp (Timestamp): timestamp in format YYYYMMDDhhmmss        
 
         Both timestamps are included.
         """
@@ -128,10 +147,17 @@ class MigrationWalker:
         ret = self._timestamps[idx_start : idx_end + 1]
         return ret
 
-
-    def _get_next_timestamp(self, reference_timestamp: str | BaseFlag, step: int) -> str:
+    def _get_next_timestamp(self, reference_timestamp: Timestamp | BaseFlag, step: int) -> Timestamp:
         """
-        Get migration timestamp given number of steps after reference timestamp.
+        Get next migration timestamp relative to reference timestamp.
+
+        Args:
+            reference_timestamp (str): reference timestamp in format YYYYMMDDhhmmss or BaseFlag (no complete migrations)
+            step (int): number of steps after reference timestamp
+
+        Returns:
+            str: Timestamp given number of steps after reference timestamp.
+
         """
         # NOTE: assumes start = base and step = 0 never happens
         if step == 0:
@@ -148,9 +174,16 @@ class MigrationWalker:
 
         return self._get_next_timestamp(next_timestamp, step-1)
     
-    def _get_previous_timestamp(self, reference_timestamp: str | BaseFlag, step: int) -> str | BaseFlag:
+    def _get_previous_timestamp(self, reference_timestamp: Timestamp | BaseFlag, step: int) -> Timestamp | BaseFlag:
         """
-        Get migration given number of steps before reference timestamp.
+        Get previous migration timestamp relative to reference timestamp.
+
+        Args:
+            reference_timestamp (str): reference timestamp in format YYYYMMDDhhmmss or BaseFlag (no complete migrations)
+            step (int): number of steps before reference timestamp
+
+        Returns:
+            str: Timestamp given number of steps before reference timestamp.        
         """
         if step == 0:
             return reference_timestamp

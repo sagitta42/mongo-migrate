@@ -1,7 +1,7 @@
 import re
-from typing import Any, Iterable
+from typing import Any
 
-from mongo_migrate.enums import Direction, Target
+from mongo_migrate.enums import Direction, Target, Timestamp
 
 
 def slugify_message(message: str, truncate_slug_length: int = 40) -> str:
@@ -26,7 +26,7 @@ def slugify_message(message: str, truncate_slug_length: int = 40) -> str:
     return slug
 
 
-def timestamp_from_filename(filename: str) -> str:
+def timestamp_from_filename(filename: str) -> Timestamp:
     """
     Extract timestamp from migration filename.
     """

@@ -11,6 +11,7 @@
     
 """
 import os.path
+from pathlib import Path
 import re
 import sys
 from datetime import datetime
@@ -21,7 +22,7 @@ from string import Template
 import pymongo
 from pymongo.database import Database
 
-from mongo_migrate.enums import BaseFlag, Direction, DirectionTargetOptions
+from mongo_migrate.enums import BaseFlag, Direction, DirectionTargetOptions, Timestamp
 from mongo_migrate.exceptions import MongoMigrateException
 from mongo_migrate.base_migrate import BaseMigration
 from mongo_migrate.migration_walker import MigrationWalker
@@ -44,7 +45,12 @@ class Migration(BaseMigration):
         return '$comment'
     """)
 
-    def __init__(self, config: Config, migrations_path: str):
+    def __init__(self, config: Config, migrations_path: Path):
+        """
+        Args:
+            config (Config): database configuration
+            migrations_path (Path): path to directory for mongo migrations  
+        """
         self.config = config
         self.migrations_path = migrations_path
 
@@ -72,9 +78,11 @@ class Migration(BaseMigration):
 
     def migrate(self, direction: Direction, target: str):
         """
-        Public method to perform the migration - upgrade or downgrade
+        Public method to perform the migration - upgrade or downgrade.
 
-        target options: timestamp or keyword target (head/base or +N/-N)
+        Args:
+            direction (Direction): migration direction
+            target (str): timestamp YYYYMMDDhhmmss or keyword target (head/base or +N/-N)
 
         Check validity of requested operation (compatibility between direction and target).
         Determine target migration timestamp if not given explicitly (e.g. upgrade head)
@@ -108,20 +116,16 @@ class Migration(BaseMigration):
 
     def create_migration(self, title: str, message: str):
         """Create the folder and the template migration file."""
-        if not os.path.exists(self.migrations_path):
-            os.makedirs(self.migrations_path)
+        os.makedirs(self.migrations_path, exist_ok=True)
 
-        filename = "{}/{}_{}.py".format(
-            self.migrations_path,
-            datetime.now().strftime('%Y%m%d%H%M%S'),
-            title)
+        filename = self.migrations_path / f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{title}.py"
 
         with open(filename, 'w') as fh:
             fh.write(self.NEW_MIGRATION_STRING.safe_substitute(comment=message))
 
         print('Migration file created: {}'.format(filename))
 
-    def _do_upgrade(self, latest_migration: str | BaseFlag, target_migration: str):
+    def _do_upgrade(self, latest_migration: Timestamp | BaseFlag, target_migration: Timestamp):
         """
         Upgrade from latest to target migration.
 
@@ -153,7 +157,7 @@ class Migration(BaseMigration):
             return
 
         # Perform migration by executing the upgrade method from the identified migrations
-        sys.path.append(self.migrations_path)
+        sys.path.append(str(self.migrations_path))
         for migration in migrations_to_apply:
             migration_module = import_module(migration.basename)
             migration_instance = migration_module.Migration(self.config)
@@ -163,8 +167,7 @@ class Migration(BaseMigration):
 
             print(f"{migration.previous.basename if migration.previous is not None else '.'} -> {migration.basename}")
 
-
-    def _do_downgrade(self, latest_migration: str | BaseFlag, target_migration: str | BaseFlag):
+    def _do_downgrade(self, latest_migration: Timestamp | BaseFlag, target_migration: Timestamp | BaseFlag):
         """
         Downgrade from latest migration to target migration.
 
@@ -194,7 +197,7 @@ class Migration(BaseMigration):
             return
 
         # Perform migration by executing the downgrade method from the identified migrations
-        sys.path.append(self.migrations_path)
+        sys.path.append(str(self.migrations_path))
         for migration in migrations_to_apply:
             migration_module = import_module(migration.basename)
             migration_instance = migration_module.Migration(self.config)
@@ -203,7 +206,6 @@ class Migration(BaseMigration):
             self._delete_migration_milestone(migration.timestamp)
 
             print(f"{migration.basename} -> {migration.previous.basename if migration.previous is not None else '.'}")
-
 
     def _get_migration_history_collection(self) -> list[str]:
         return self.db.list_collection_names(filter={'name': 'migration_history'})
@@ -223,12 +225,12 @@ class Migration(BaseMigration):
     def _delete_migration_milestone(self, migration_datetime):
         self.db.migration_history.delete_one({'migration_datetime': migration_datetime})
 
-    def _get_latest_migrated_timestamp(self) -> str | BaseFlag:
+    def _get_latest_migrated_timestamp(self) -> Timestamp | BaseFlag:
         """
         Get timestamp of the latest completed migration based on migration history.
 
-        If there aren't any completed migrations (no migration history present),
-            return base.
+        Returns:
+            Timestamp | BaseFlag: timestamp in YYYYMMDDhhmmss format or BaseFlag if no migrations are complete (no migration history present)
         """
         if not self._get_migration_history_collection():
             return BaseFlag.base

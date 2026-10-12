@@ -1,5 +1,7 @@
 import enum
 
+# YYYYMMDDhhmmss 
+Timestamp = str
 
 class Direction(str, enum.Enum):
     up = "upgrade"
