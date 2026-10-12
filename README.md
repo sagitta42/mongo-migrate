@@ -32,17 +32,17 @@ The mongo-migrate library can create migrations, and perform upgrade and downgra
 
 ### Create Migrations
 
-    usage: mongo-migrate create [-h] [--host HOST] [--port PORT] [--database DATABASE] [--migrations MIGRATIONS] [--title TITLE] --message MESSAGE
+    usage: mongo-migrate create [-h] [--host HOST] [--port PORT] [--database DATABASE] [--migrations MIGRATIONS] --message MESSAGE [--title TITLE]
     
-    optional arguments:
+    options:
       -h, --help            show this help message and exit
       --host HOST           the database host
       --port PORT           the database port
-      --database DATABASE   provide the database name
+      --database DATABASE   the database name
       --migrations MIGRATIONS
-                            provide the folder to store migrations
-      --title TITLE         title will be used in the file name
-      --message MESSAGE     message will be recorded as a comment inside the migration file
+                            provide the folder to store migrations. By default creates migrations/
+      --message MESSAGE     short message that will be saved as a comment inside the migration file
+      --title TITLE         short title that will be used in the file name. Default: contents of --message
 
 An example command would look like this:
     
@@ -51,27 +51,29 @@ An example command would look like this:
 
 ### Upgrade database
 
-    usage: mongo-migrate upgrade [-h] [--host HOST] [--port PORT] [--database DATABASE] [--migrations MIGRATIONS] [--upto UPTO] [target_migration]
-
+    usage: mongo-migrate upgrade [-h] [--host HOST] [--port PORT] [--database DATABASE] [--migrations MIGRATIONS] [--upto UPTO] [--username USERNAME] [--password PASSWORD] [target_migration]
+    
     positional arguments:
       target_migration      target migration timestamp or keyword (options: head, +N)
-
-    optional arguments:
+    
+    options:
       -h, --help            show this help message and exit
       --host HOST           the database host
       --port PORT           the database port
-      --database DATABASE   provide the database name
+      --database DATABASE   the database name
       --migrations MIGRATIONS
-                            provide the folder to store migrations
+                            provide the folder to store migrations. By default creates migrations/
       --upto UPTO           target migration timestamp or keyword (options: head, +N)
+      --username USERNAME   the database user
+      --password PASSWORD   the database user
 
-The positional argument `target_migration` is an alternative to the keyword argument `--upto` (the latter would override the former, at least one is required)
+The positional argument `target_migration` is an alternative to the keyword argument `--upto` (the latter would override the former, at least one is required); `--upto` is remaining for backwards compatibility
 
 Example commands would look like this:
     
-    mongo-migrate upgrade --host 127.0.0.1 --port 27017 --database test 20230815092813
-    mongo-migrate upgrade --host 127.0.0.1 --port 27017 --database test head
-    mongo-migrate upgrade --host 127.0.0.1 --port 27017 --database test +3
+    mongo-migrate upgrade 20230815092813 --host 127.0.0.1 --port 27017 --database test
+    mongo-migrate upgrade head --host 127.0.0.1 --port 27017 --database test
+    mongo-migrate upgrade +3 --host 127.0.0.1 --port 27017 --database test --username user42 --password abc123
 
 head: upgrade to and including the latest migration
 
@@ -79,33 +81,35 @@ head: upgrade to and including the latest migration
 
 ### Downgrade database
 
-    usage: mongo-migrate downgrade [-h] [--host HOST] [--port PORT] [--database DATABASE] [--migrations MIGRATIONS] [--upto UPTO]
-
+    usage: mongo-migrate downgrade [-h] [--host HOST] [--port PORT] [--database DATABASE] [--migrations MIGRATIONS] [--upto UPTO] [--username USERNAME] [--password PASSWORD] [target_migration]
+    
     positional arguments:
       target_migration      target migration timestamp or keyword (options: base, -N)
-
-    optional arguments:
+    
+    options:
       -h, --help            show this help message and exit
       --host HOST           the database host
       --port PORT           the database port
-      --database DATABASE   provide the database name
+      --database DATABASE   the database name
       --migrations MIGRATIONS
-                            provide the folder to store migrations
+                            provide the folder to store migrations. By default creates migrations/
       --upto UPTO           target migration timestamp or keyword (options: base, -N)
+      --username USERNAME   the database user
+      --password PASSWORD   the database user
 
 Example commands would look like this:
     
-    mongo-migrate downgrade --host 127.0.0.1 --port 27017 --database test 20230815092813
-    mongo-migrate downgrade --host 127.0.0.1 --port 27017 --database test base
-    mongo-migrate downgrade --host 127.0.0.1 --port 27017 --database test -3 
+    mongo-migrate downgrade 20230815092813 --host 127.0.0.1 --port 27017 --database test
+    mongo-migrate downgrade base --host 127.0.0.1 --port 27017 --database test
+    mongo-migrate downgrade -3 --host 127.0.0.1 --port 27017 --database test --username user42 --password abc123
 
 base: downgrade all migrations
 
 -N: downgrade this and N-1 previous migrations
 
-## Configuration file
+## Configuration file `mongomigrate.ini`
 
-Some or all of the following settings can be set in a configuration file `mongomigrate.ini` with the following format:
+Some or all of the configuration can be set in a configuration file `mongomigrate.ini` with the following format:
 
 ```ini
 [database]
@@ -129,14 +133,39 @@ $ mongo-migrate downgrade base
 $ mongo-migrate downgrade -3
 ```
 
-The settings must be provided either in `.ini` or as command line arguments, not both
+Hybrid CLI/`.ini` example:
+
+```bash
+mongo-migrate upgraade head --username user42 --password abc123
+```
+
+(only username and password are provided via CLI, the rest from `.ini` configuration)
+
+The settings must be provided either in `.ini` or as command line arguments, not both.
+
+## Environment file `.env`
+
+Some or all of the configuration can be set in the environment file `.env` with the following format:
+
+```env
+MONGO_DB_NAME=test
+MONGO_HOST=127.0.0.1
+MONGO_PORT=27017
+MONGO_INITDB_ROOT_USERNAME=user42
+MONGO_INITDB_ROOT_PASSWORD=abc123
+MIGRATIONS=mongo_migrations
+```
+
+as an alternative to keyword arguments or `mongomigrate.ini` (see `.env.template` in this repository).
+
+This allows for shorter CLI commands same as in case of `mongomigrate.ini` as well as recycling existing MongoDB environment settings (e.g. set up for `docker-compose.yml` MongoDB service)
+
+The settings must be provided either in `.ini` or `.env` or as command line arguments in a complementary way (no duplications).
 
 ## Planned Enhancements
 
 Our commitment to continuous improvement includes planned features such as:
-  * Support for connection string, 
-  * Support for authenticated databases
-  * Configuration Files: Eliminate the need for repetitive CLI arguments. 
+  * Support for connection string
   * More migration generation shortcuts
 
 ## Get Involved
