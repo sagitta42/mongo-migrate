@@ -66,7 +66,7 @@ class Migration(BaseMigration):
         """
         Get list of all migration filenames from oldest to newest.
         """
-        ret = list(filter(lambda x: re.match('\d+_.+\.py', x), os.listdir(self.migrations_path)))
+        ret = list(filter(lambda x: re.match(r'\d+_.+\.py', x), os.listdir(self.migrations_path)))
         ret.sort()
         return ret
 
