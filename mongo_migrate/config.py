@@ -7,7 +7,7 @@ from typing import Any, Optional, Self
 
 from mongo_migrate.env import EnvSettings
 from mongo_migrate.exceptions import ConfigException
-from mongo_migrate.utils import values_are_complete
+from mongo_migrate.utils import check_completeness
 
 
 @dataclass
@@ -38,16 +38,14 @@ class BaseConfig(BaseModel):
         ret = list(self.model_dump().keys())
         return ret
 
-    @property
-    def is_complete(self) -> bool:
+    def check_completeness(self):
         """
         Check if configuration is complete.
 
         Complete means all fields are not null.
         """
-        field_values = self.model_dump().values()
-        ret = values_are_complete(field_values)
-        return ret
+        field_values = self.model_dump()
+        check_completeness(field_values)
 
     def is_complementary(self, other: Self) -> bool:
         """
@@ -93,8 +91,7 @@ class DBConfig(BaseConfig):
     username: Optional[str] = None
     password: Optional[str] = None
 
-    @property
-    def is_complete(self) -> bool:
+    def check_completeness(self):
         """
         Check if database configuration is complete.
 
@@ -102,8 +99,7 @@ class DBConfig(BaseConfig):
         Those can be null in case database does not require authentication.
         """
         field_values = self.model_dump(exclude={"username": True, "password": True})
-        ret = values_are_complete(field_values)
-        return ret
+        check_completeness(field_values)
 
 
 class MigrationConfig(BaseConfig):
@@ -168,17 +164,17 @@ class ConfigBuilder:
             if not configs[config1].is_complementary(configs[config2]):
                 raise ConfigException(
                     ConfigException.error_message(
-                        f"{config1} and {config2} not complementary",
+                        f"{config1} and {config2} not complementary (duplicate values)",
                         configs[config1],
                         configs[config2],
                     ),
                 )
 
         final_config = configs["CLI"] + configs[".ini"] + configs[".env"]
-        if not final_config.is_complete:
-            raise ConfigException(
-                ConfigException.error_message("incomplete", final_config)
-            )
+        try:
+            final_config.check_completeness()
+        except ValueError as e:
+            raise ConfigException(ConfigException.error_message(str(e), final_config))
 
         return final_config
 

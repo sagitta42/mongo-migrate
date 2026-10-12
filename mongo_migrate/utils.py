@@ -11,12 +11,12 @@ def slugify_message(message: str, truncate_slug_length: int = 40) -> str:
     Filename incompatible characters (e.g. punctuation, /) are removed.
     Spaces are replaced by underscores.
     All characters converted to lowercase.
-    
+
     >>> slugify_message("add ABCD data/info")
     "add_abcd_data_info"
 
     Procedure taken from alembic:
-    https://github.com/sqlalchemy/alembic/blob/main/alembic/script/base.py    
+    https://github.com/sqlalchemy/alembic/blob/main/alembic/script/base.py
     """
     _slug_re = re.compile(r"\w+")
 
@@ -30,7 +30,7 @@ def timestamp_from_filename(filename: str) -> str:
     """
     Extract timestamp from migration filename.
     """
-    return filename.split('_')[0]
+    return filename.split("_")[0]
 
 
 def is_timestamp_target(target: str) -> bool:
@@ -83,19 +83,19 @@ def direction_target_is_valid(direction: Direction, target: str) -> bool:
 
     if direction == Direction.up and not is_upgrade_target(target):
         return False
-    
+
     if direction == Direction.down and not is_downgrade_target(target):
         return False
 
     return True
 
-def values_are_complete(values: Iterable[Any]) -> bool:
+
+def check_completeness(config: dict[str, Any]):
     """
     Check if values are complete.
 
     Complete means all values are not null.
     """
-    for value in values:
+    for key, value in config.items():
         if value is None:
-            return False
-    return True        
+            raise ValueError(f"Missing value for {key}")
